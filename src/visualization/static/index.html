@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Apneia do Sono</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <style>
+        body { background-color: #0e1117; color: white; font-family: 'Segoe UI', sans-serif; }
+        .card { background-color: #1e2130; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        .kpi-title { font-size: 11px; opacity: 0.7; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .kpi-value { font-size: 20px; font-weight: bold; margin: 0; }
+        .kpi-unit { font-size: 10px; opacity: 0.5; margin-top: 2px; }
+        .tab-btn { padding: 6px 16px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); background: transparent; display: flex; align-items: center; gap: 6px; }
+        .tab-btn:hover { color: white; background: rgba(255,255,255,0.05); }
+        .tab-btn.active { color: white; background: rgba(37, 99, 235, 0.15); border-color: #2563eb; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        th.sort-asc .sort-icon::after { content: ' ↑'; }
+        th.sort-desc .sort-icon::after { content: ' ↓'; }
+        th .sort-icon { opacity: 0.4; }
+        th:hover .sort-icon { opacity: 1; }
+        th.sort-asc .sort-icon, th.sort-desc .sort-icon { opacity: 1; }
+        select { outline: none; }
+        .info-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.5);
+            font-size: 9px; font-weight: 700; cursor: help;
+            position: relative; font-style: normal; line-height: 1;
+        }
+        .info-btn:hover { background: rgba(255,255,255,0.25); color: white; }
+        .info-btn .tooltip {
+            visibility: hidden; opacity: 0;
+            position: absolute; bottom: calc(100% + 8px); left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b; color: #e2e8f0;
+            padding: 10px 14px; border-radius: 8px;
+            font-size: 11px; font-weight: 400;
+            white-space: normal; width: 270px;
+            text-align: left; line-height: 1.5;
+            z-index: 50; pointer-events: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            transition: opacity 0.2s, visibility 0.2s;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .info-btn .tooltip::after {
+            content: ''; position: absolute; top: 100%; left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent; border-top-color: #1e293b;
+        }
+        .info-btn.active .tooltip { visibility: visible; opacity: 1; }
+        .section-header { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .subsection-header { font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; margin-top: 16px; }
+        .custom-select { background-color: #111827; color: #d1d5db; border: 1px solid #374151; border-radius: 6px; padding: 4px 10px; font-size: 13px; }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6">
+        <h1 class="text-2xl font-semibold flex items-center gap-2">
+            <span class="text-yellow-500 text-3xl">🌙</span> Dashboard Apneia do Sono
+        </h1>
+        <div class="flex flex-wrap gap-2 items-center">
+            <select id="patientSelect" class="custom-select"><option value="">Carregando...</option></select>
+            <select id="monthSelect" class="custom-select"><option value="">Mês...</option></select>
+            <select id="yearSelect" class="custom-select"><option value="">Ano...</option></select>
+        </div>
+    </div>
+
+    <div class="flex gap-2 mb-6 pb-2 border-b border-gray-800">
+        <button class="tab-btn active" data-tab="resumo">
+            <span class="text-lg">📊</span> Resumo
+        </button>
+        <button class="tab-btn" data-tab="graficos">
+            <span class="text-lg">📈</span> Gráficos
+        </button>
+        <button class="tab-btn" data-tab="tabelas">
+            <span class="text-lg">📑</span> Tabelas
+        </button>
+    </div>
+
+    <div id="tab-resumo" class="tab-content active">
+        <!-- NOITE -->
+        <div class="mb-8">
+            <div class="section-header text-gray-300">
+                <span id="resumo-noite-title">Noite - --/--/----</span>
+                <span class="opacity-70 cursor-pointer hover:opacity-100 transition-opacity ml-2 text-xl" id="btn-calendar" title="Selecionar Data">📅</span>
+                <input type="text" id="datePicker" class="hidden">
+            </div>
+            
+            <div class="subsection-header text-blue-500">● <span class="text-gray-400">CPAP</span></div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div class="card flex items-center justify-center gap-4 relative">
+                    <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pontuação myAir (0-100)<br><br><b>Detalhes:</b> Avaliação geral da qualidade do uso do CPAP calculada pela ResMed.</span></i>
+                    <div id="kpi-score-circle" class="w-12 h-12 rounded-full border-4 border-gray-600 flex items-center justify-center text-xl">
+                        ⚙️
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="kpi-score-text" class="text-gray-400 font-bold text-lg leading-tight">--</span>
+                        <span class="text-xs opacity-60">CPAP <span id="kpi-score-top">--</span></span>
+                    </div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Uso da Máscara<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Tempo de Uso<br><br><b>Detalhes:</b> Duração total que a máscara foi utilizada durante a sessão.</span></i></div>
+                    <div id="kpi-usage-top" class="kpi-value text-green-400">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Eventos por Hora<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> IAH (Eventos/Hora)<br><br><b>Detalhes:</b> Número médio de eventos de apneia e hipopneia por hora de sono.</span></i></div>
+                    <div id="kpi-ahi-top" class="kpi-value text-green-400">--</div>
+                    <div class="kpi-unit">IAH</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Fuga<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Fuga de Ar P95<br><br><b>Detalhes:</b> Volume de vazamento de ar pela máscara. (95% do tempo o vazamento foi menor que este valor).</span></i></div>
+                    <div id="kpi-leak-top" class="kpi-value text-gray-400">--</div>
+                    <div class="kpi-unit">L/min</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Eventos Máscara<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Eventos de Máscara<br><br><b>Detalhes:</b> Quantidade de vezes que a máscara foi retirada durante a sessão.</span></i></div>
+                    <div id="kpi-mask-top" class="kpi-value text-gray-400">--</div>
+                    <div class="kpi-unit">remoções</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Pressão<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pressão P95<br><br><b>Detalhes:</b> Pressão atingida ou não ultrapassada durante 95% do tempo da terapia.</span></i></div>
+                    <div id="kpi-pressure-top" class="kpi-value text-blue-400">--</div>
+                    <div class="kpi-unit">cmH₂O</div>
+                </div>
+            </div>
+
+            <div class="subsection-header text-purple-500">● <span class="text-gray-400">Smartband</span></div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div class="card flex items-center justify-center gap-4 relative">
+                    <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Score do Sono<br><br><b>Detalhes:</b> Pontuação geral de qualidade do sono medida pela Smartband.</span></i>
+                    <div id="kpi-mif-score-circle" class="w-12 h-12 rounded-full border-4 border-gray-600 flex items-center justify-center text-xl">
+                        😴
+                    </div>
+                    <div class="flex flex-col">
+                        <span id="kpi-mif-score-text" class="text-gray-400 font-bold text-lg leading-tight">--</span>
+                        <span class="text-xs opacity-60">Score <span id="kpi-mif-score">--</span></span>
+                    </div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Duração Total<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Duração Total<br><br><b>Detalhes:</b> Tempo total dormindo registrado pela pulseira.</span></i></div>
+                    <div id="kpi-mif-total" class="kpi-value text-white">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">REM<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Sono REM<br><br><b>Detalhes:</b> Fase do sono associada a sonhos e recuperação mental.</span></i></div>
+                    <div id="kpi-mif-rem" class="kpi-value text-yellow-500">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Profundo<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Sono Profundo<br><br><b>Detalhes:</b> Fase mais restauradora do sono para recuperação física.</span></i></div>
+                    <div id="kpi-mif-deep" class="kpi-value text-blue-500">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Leve<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Sono Leve<br><br><b>Detalhes:</b> Fase de transição entre estar acordado e o sono profundo.</span></i></div>
+                    <div id="kpi-mif-light" class="kpi-value text-orange-400">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Acordado<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Tempo Acordado<br><br><b>Detalhes:</b> Total de tempo acordado durante a noite.</span></i></div>
+                    <div id="kpi-mif-awake" class="kpi-value text-purple-400">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ÚLTIMOS DIAS -->
+        <div class="mb-4">
+            <div class="section-header text-gray-300">
+                <span id="resumo-dias-title">Últimos 7 Dias - --/--/---- - --/--/----</span>
+            </div>
+            
+            <div class="subsection-header text-blue-500">● <span class="text-gray-400">CPAP</span></div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Uso<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Uso Diário<br><br><b>Detalhes:</b> Tempo médio de utilização do CPAP por noite.</span></i></div>
+                    <div id="avg-usage" class="kpi-value text-green-400">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média IAH<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média do IAH<br><br><b>Detalhes:</b> Índice de apneia e hipopneia médio no período selecionado.</span></i></div>
+                    <div id="avg-ahi" class="kpi-value text-yellow-500">--</div>
+                    <div class="kpi-unit">eventos/h</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Fuga<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Fuga (P95)<br><br><b>Detalhes:</b> Valor médio do vazamento de ar (P95) no período.</span></i></div>
+                    <div id="avg-leak" class="kpi-value text-gray-300">--</div>
+                    <div class="kpi-unit">L/min</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Pressão<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Pressão (P95)<br><br><b>Detalhes:</b> Valor médio da pressão (P95) aplicada durante o período.</span></i></div>
+                    <div id="avg-pressure" class="kpi-value text-blue-400">--</div>
+                    <div class="kpi-unit">cmH₂O</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Score<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média do Score myAir<br><br><b>Detalhes:</b> Pontuação média de avaliação da terapia no período.</span></i></div>
+                    <div id="avg-score" class="kpi-value text-green-400">--</div>
+                    <div class="kpi-unit">pontos</div>
+                </div>
+            </div>
+
+            <div class="subsection-header text-purple-500">● <span class="text-gray-400">Smartband</span></div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Duração<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Duração do Sono<br><br><b>Detalhes:</b> Tempo médio de sono por noite no período.</span></i></div>
+                    <div id="avg-sleep" class="kpi-value text-white">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Score<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média do Score do Sono<br><br><b>Detalhes:</b> Avaliação média da qualidade do sono no período.</span></i></div>
+                    <div id="avg-sleepscore" class="kpi-value text-green-400">--</div>
+                    <div class="kpi-unit">pontos</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média REM<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Sono REM<br><br><b>Detalhes:</b> Tempo médio passado na fase REM por noite.</span></i></div>
+                    <div id="avg-rem" class="kpi-value text-yellow-500">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Profundo<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Sono Profundo<br><br><b>Detalhes:</b> Tempo médio de sono profundo por noite.</span></i></div>
+                    <div id="avg-deep" class="kpi-value text-blue-500">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Leve<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Sono Leve<br><br><b>Detalhes:</b> Tempo médio de sono leve por noite.</span></i></div>
+                    <div id="avg-light" class="kpi-value text-orange-400">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+                <div class="card text-center relative flex flex-col justify-center items-center">
+                    <div class="kpi-title">Média Acordado<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Tempo Acordado<br><br><b>Detalhes:</b> Tempo médio acordado por noite no período.</span></i></div>
+                    <div id="avg-awake" class="kpi-value text-purple-400">--</div>
+                    <div class="kpi-unit">horas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-graficos" class="tab-content">
+        <div class="flex flex-col gap-4">
+            <div class="card">
+                <div class="kpi-title justify-start mb-4">Pontuação CPAP<i class="info-btn absolute top-2 right-2">?<span class="tooltip">Pontuação myAir.</span></i></div>
+                <div class="h-48 relative"><canvas id="chartScore"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="kpi-title justify-start mb-4">Score Sono<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Score do Sono<br><br><b>Detalhes:</b> Pontuação geral de qualidade do sono medida pela Smartband.</span></i></div>
+                <div class="h-48 relative"><canvas id="chartSleepScore"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="kpi-title justify-start mb-4">IAH (eventos/h)<i class="info-btn absolute top-2 right-2">?<span class="tooltip">Índice de Apneia-Hipopneia.</span></i></div>
+                <div class="h-48 relative"><canvas id="chartAhi"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="kpi-title justify-start mb-4">Pressão (cmH₂O)<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pressão P95<br><br><b>Detalhes:</b> Pressão atingida ou não ultrapassada durante 95% do tempo da terapia.</span></i></div>
+                <div class="h-48 relative"><canvas id="chartPressure"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-tabelas" class="tab-content">
+        <div class="card mb-4">
+            <h2 class="text-sm font-semibold mb-4 text-gray-300">Distribuição do Sono - Tabela Mensal</h2>
+            <div class="overflow-x-auto">
+                <table id="sleepTable" class="w-full text-xs text-left text-gray-300">
+                    <thead class="text-xs uppercase bg-[#161925] text-gray-300 border-b border-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="report_date">Data <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="total_duration_min">Duração <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="rem_min">REM <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="deep_min">Profundo <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="light_min">Leve <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="awake_min">Acordado <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="rem_pct">% REM <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="sleepTableBody">
+                        <tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">Carregando dados...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <h2 class="text-sm font-semibold mb-4 text-gray-300">Dados CPAP - Tabela Mensal</h2>
+            <div class="overflow-x-auto">
+                <table id="cpapTable" class="w-full text-xs text-left text-gray-300">
+                    <thead class="text-xs uppercase bg-[#161925] text-gray-300 border-b border-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="data_sessao">Data <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="usage_mins">Uso <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="ahi">IAH <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="leak_95">Fuga 95% <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="mask_events">Eventos <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="score">Score <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="pressure">Pressão <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="tidal_volume">Vol. Tidal <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="minute_ventilation">Vent. Minuto <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="breath_rate">Freq. Resp. <span class="sort-icon">↕</span></th>
+                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="p95_pressure">P95 Pressão <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cpapTableBody">
+                        <tr><td colspan="11" class="px-4 py-3 text-center text-gray-500">Carregando dados...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        Chart.register(ChartDataLabels);
+        Chart.defaults.color = '#a0aec0';
+        Chart.defaults.font.family = "'Segoe UI', sans-serif";
+        Chart.defaults.plugins.legend.labels.color = '#a0aec0';
+        Chart.defaults.plugins.datalabels = {
+            color: 'white', font: { weight: 'bold', size: 10 },
+            anchor: 'center', align: 'center',
+            formatter: (value) => typeof value === 'number' ? (Number.isInteger(value) ? value : value.toFixed(1)) : value,
+            display: function(context) { return context.dataset.data[context.dataIndex] > 0; }
+        };
+
+        let charts = {};
+        let currentMonth = null;
+        let currentYear = null;
+        let availablePeriods = [];
+        let sleepData = [];
+        let cpapData = [];
+        let globalSelectedDate = null;
+        let globalSelectedPeriod = 7;
+        let currentPatientData = null;
+        let currentMiData = null;
+        let sortState = {
+            sleep: { col: 'report_date', dir: 'desc' },
+            cpap: { col: 'data_sessao', dir: 'desc' }
+        };
+
+        
+        // Flatpickr setup
+        let datePickerInstance = flatpickr("#datePicker", {
+            locale: "pt",
+            dateFormat: "Y-m-d",
+            onChange: function(selectedDates, dateStr, instance) {
+                if (selectedDates.length > 0) {
+                    globalSelectedDate = dateStr;
+                    if (currentPatientData && currentMiData) {
+                        updateKPIs(currentPatientData, currentMiData);
+                        renderGraficosCharts(currentPatientData, currentMiData);
+                        updateAverages(currentPatientData, currentMiData);
+                    }
+                }
+            }
+        });
+
+        document.getElementById('btn-calendar').addEventListener('click', () => {
+            if (currentPatientData && currentPatientData.timeseries && currentPatientData.timeseries.data_sessao) {
+                datePickerInstance.set('enable', currentPatientData.timeseries.data_sessao);
+            }
+            datePickerInstance.open();
+        });
+
+        // Period Buttons
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                globalSelectedPeriod = parseInt(e.target.dataset.period);
+                if (currentPatientData && currentMiData) {
+                    updateAverages(currentPatientData, currentMiData);
+                    renderGraficosCharts(currentPatientData, currentMiData);
+                }
+            });
+        });
+
+        
+        // Tooltip Click Logic
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.info-btn');
+            if (btn) {
+                const isActive = btn.classList.contains('active');
+                document.querySelectorAll('.info-btn.active').forEach(el => el.classList.remove('active'));
+                if (!isActive) {
+                    btn.classList.add('active');
+                }
+            } else {
+                document.querySelectorAll('.info-btn.active').forEach(el => el.classList.remove('active'));
+            }
+        });
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        function sortTable(table, col, dir) {
+            const data = table === 'sleep' ? sleepData : cpapData;
+            const isDate = col === 'report_date' || col === 'data_sessao';
+            data.sort((a, b) => {
+                let valA = isDate ? new Date(a[col]) : (parseFloat(a[col]) || 0);
+                let valB = isDate ? new Date(b[col]) : (parseFloat(b[col]) || 0);
+                if (valA < valB) return dir === 'asc' ? -1 : 1;
+                if (valA > valB) return dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+            if (table === 'sleep') renderSleepTable(data);
+            else renderCpapTable(data);
+        }
+
+        function updateSortIcons(table) {
+            const state = sortState[table];
+            document.querySelectorAll(`th[data-table="${table}"]`).forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.col === state.col) th.classList.add(state.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            const th = e.target.closest('th[data-table]');
+            if (!th) return;
+            const table = th.dataset.table;
+            const col = th.dataset.col;
+            const state = sortState[table];
+            if (state.col === col) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+            else { state.col = col; state.dir = 'asc'; }
+            updateSortIcons(table);
+            sortTable(table, state.col, state.dir);
+        });
+
+        async function loadAvailablePeriods(patient) {
+            if (!patient) return;
+            try {
+                const res = await fetch(`/api/available-periods?patient=${patient}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                availablePeriods = data.periods;
+                updateDateSelectors();
+            } catch (e) { console.error("Error loading periods", e); }
+        }
+
+        function updateDateSelectors() {
+            const monthSelect = document.getElementById('monthSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            monthSelect.innerHTML = '';
+            yearSelect.innerHTML = '';
+            if (availablePeriods.length === 0) return;
+            const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+            const uniqueYears = [...new Set(availablePeriods.map(p => p.year))].sort((a, b) => b - a);
+            const uniqueMonths = [...new Set(availablePeriods.map(p => p.month))].sort((a, b) => a - b);
+            uniqueYears.forEach(y => { const opt = document.createElement('option'); opt.value = y; opt.textContent = y; yearSelect.appendChild(opt); });
+            uniqueMonths.forEach(m => { const opt = document.createElement('option'); opt.value = m; opt.textContent = months[m - 1]; monthSelect.appendChild(opt); });
+            const first = availablePeriods[0];
+            currentYear = first.year;
+            currentMonth = first.month;
+            yearSelect.value = currentYear;
+            monthSelect.value = currentMonth;
+            loadMonthlySleep();
+            loadMonthlyCpap();
+            monthSelect.addEventListener('change', (e) => { currentMonth = parseInt(e.target.value); loadMonthlySleep(); loadMonthlyCpap(); });
+            yearSelect.addEventListener('change', (e) => { currentYear = parseInt(e.target.value); loadMonthlySleep(); loadMonthlyCpap(); });
+        }
+
+        function formatHoursMinutes(mins) {
+            if (!mins) return "0h 0m";
+            const h = Math.floor(mins / 60);
+            const m = Math.floor(mins % 60);
+            return `${h}h ${m}m`;
+        }
+
+        function formatHoursDecimal(mins) {
+            if (!mins) return "0.0h";
+            return (mins / 60).toFixed(1) + 'h';
+        }
+
+        function createChart(ctxId, type, data, options) {
+            if (charts[ctxId]) { charts[ctxId].destroy(); delete charts[ctxId]; }
+            const el = document.getElementById(ctxId);
+            if (!el) return;
+            const ctx = el.getContext('2d');
+            charts[ctxId] = new Chart(ctx, { type, data, options });
+        }
+
+        async function fetchPatients() {
+            const res = await fetch('/api/patients');
+            const patients = await res.json();
+            const select = document.getElementById('patientSelect');
+            select.innerHTML = '';
+            patients.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = p;
+                select.appendChild(opt);
+            });
+            if (patients.length > 0) {
+                loadPatientData(patients[0]);
+                loadAvailablePeriods(patients[0]);
+            }
+        }
+
+        async function loadMonthlySleep(patient) {
+            if (!patient) patient = document.getElementById('patientSelect').value;
+            if (!patient || !currentMonth || !currentYear) return;
+            try {
+                const res = await fetch(`/api/smartband/${patient}/monthly-sleep?year=${currentYear}&month=${currentMonth}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                sleepData = data.rows.map(row => {
+                    const total = row.total_duration_min || 0;
+                    const rem = row.rem_min || 0;
+                    return { ...row, rem_pct: total > 0 ? ((rem / total) * 100) : 0 };
+                });
+                sortState.sleep = { col: 'report_date', dir: 'desc' };
+                updateSortIcons('sleep');
+                sortTable('sleep', 'report_date', 'desc');
+            } catch (e) { console.error("Error loading monthly sleep", e); }
+        }
+
+        async function loadMonthlyCpap(patient) {
+            if (!patient) patient = document.getElementById('patientSelect').value;
+            if (!patient || !currentMonth || !currentYear) return;
+            try {
+                const res = await fetch(`/api/cpap/${patient}/monthly?year=${currentYear}&month=${currentMonth}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                cpapData = data.rows;
+                sortState.cpap = { col: 'data_sessao', dir: 'desc' };
+                updateSortIcons('cpap');
+                sortTable('cpap', 'data_sessao', 'desc');
+            } catch (e) { console.error("Error loading monthly CPAP", e); }
+        }
+
+        function renderCpapTable(rows) {
+            const tbody = document.getElementById('cpapTableBody');
+            if (!rows || rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-3 text-center text-gray-500">Sem dados para o período selecionado</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(row => {
+                const score = row.score || 0;
+                const scoreColor = score >= 70 ? 'text-green-500' : score >= 50 ? 'text-yellow-500' : 'text-red-500';
+                return `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e] transition-colors">
+                    <td class="px-4 py-3 text-gray-400">${row.data_sessao}</td>
+                    <td class="px-4 py-3">${formatHoursMinutes(row.usage_mins)}</td>
+                    <td class="px-4 py-3 text-yellow-500">${(row.ahi||0).toFixed(1)}</td>
+                    <td class="px-4 py-3">${(row.leak_95 || 0).toFixed(1)} L/min</td>
+                    <td class="px-4 py-3">${Math.round(row.mask_events || 0)}</td>
+                    <td class="px-4 py-3 ${scoreColor}">${score}</td>
+                    <td class="px-4 py-3">${(row.pressure || 0).toFixed(1)}</td>
+                    <td class="px-4 py-3">${(row.tidal_volume || 0).toFixed(0)}</td>
+                    <td class="px-4 py-3">${(row.minute_ventilation || 0).toFixed(1)}</td>
+                    <td class="px-4 py-3">${(row.breath_rate || 0).toFixed(1)}</td>
+                    <td class="px-4 py-3">${(row.p95_pressure || 0).toFixed(1)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderSleepTable(rows) {
+            const tbody = document.getElementById('sleepTableBody');
+            if (!rows || rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">Sem dados para o período selecionado</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(row => {
+                const total = row.total_duration_min || 0;
+                const rem = row.rem_min || 0;
+                const remPct = row.rem_pct ? row.rem_pct.toFixed(1) : '0.0';
+                return `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e] transition-colors">
+                    <td class="px-4 py-3 text-gray-400">${row.report_date}</td>
+                    <td class="px-4 py-3">${formatHoursMinutes(total)}</td>
+                    <td class="px-4 py-3 text-yellow-500">${formatHoursDecimal(rem)}</td>
+                    <td class="px-4 py-3 text-blue-500">${formatHoursDecimal(row.deep_min || 0)}</td>
+                    <td class="px-4 py-3 text-orange-400">${formatHoursDecimal(row.light_min || 0)}</td>
+                    <td class="px-4 py-3 text-purple-400">${formatHoursDecimal(row.awake_min || 0)}</td>
+                    <td class="px-4 py-3">${remPct}%</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function loadPatientData(patient) {
+            const res = await fetch(`/api/data/${patient}`);
+            const data = await res.json();
+            let miData = { sleep: {}, activity: {} };
+            try {
+                const resMi = await fetch(`/api/smartband/${patient}/daily`);
+                if (resMi.ok) miData = await resMi.json();
+            } catch (e) { console.error("Error loading MiFitness", e); }
+            currentPatientData = data;
+            currentMiData = miData;
+            
+            // Set globalSelectedDate to latest if not set or not in new patient data
+            if (data.timeseries && data.timeseries.data_sessao && data.timeseries.data_sessao.length > 0) {
+                const dates = data.timeseries.data_sessao;
+                if (!globalSelectedDate || !dates.includes(globalSelectedDate)) {
+                    globalSelectedDate = dates[dates.length - 1];
+                }
+                datePickerInstance.setDate(globalSelectedDate);
+            }
+            
+            updateKPIs(data, miData);
+            renderGraficosCharts(data, miData);
+            updateAverages(data, miData);
+        }
+
+        function formatDateBR(dateStr) {
+            if (!dateStr) return '--/--/----';
+            const parts = dateStr.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return dateStr;
+        }
+
+        function updateKPIs(data, miData) {
+            const ts = data.timeseries;
+            const dates = ts.data_sessao || [];
+            
+            let idx = dates.length > 0 ? dates.length - 1 : -1;
+            if (globalSelectedDate) {
+                const foundIdx = dates.indexOf(globalSelectedDate);
+                if (foundIdx !== -1) idx = foundIdx;
+            }
+            
+            const lastDate = idx >= 0 ? dates[idx] : null;
+            document.getElementById('resumo-noite-title').textContent = `Noite - ${formatDateBR(lastDate)}`;
+
+            let cScore = 0, usageMins = 0, ahi = 0, leak = 0, maskEvents = 0, pressure = 0;
+            if (idx >= 0) {
+                cScore = ts.score && ts.score[idx] ? ts.score[idx] : 0;
+                usageMins = ts.usage_mins && ts.usage_mins[idx] ? ts.usage_mins[idx] : 0;
+                ahi = ts.AHI && ts.AHI[idx] ? ts.AHI[idx] : 0;
+                leak = ts['Leak.95'] && ts['Leak.95'][idx] ? ts['Leak.95'][idx] : 0;
+                maskEvents = ts.mask_events && ts.mask_events[idx] ? ts.mask_events[idx] : 0;
+                pressure = ts['BlowPress.95'] && ts['BlowPress.95'][idx] ? ts['BlowPress.95'][idx] : 0;
+            }
+            
+            const usageH = Math.floor(usageMins / 60);
+            const usageM = Math.floor(usageMins % 60);
+            
+            // CPAP Score Logic
+            let cText = cScore >= 70 ? 'Excelente' : cScore >= 50 ? 'Bom' : 'Ruim';
+            let cColor = cScore >= 70 ? 'text-green-500' : cScore >= 50 ? 'text-yellow-500' : 'text-red-500';
+            let cBorder = cScore >= 70 ? 'border-green-500' : cScore >= 50 ? 'border-yellow-500' : 'border-red-500';
+            
+            document.getElementById('kpi-score-top').textContent = cScore;
+            document.getElementById('kpi-score-text').textContent = cText;
+            document.getElementById('kpi-score-text').className = `font-bold text-lg leading-tight ${cColor}`;
+            document.getElementById('kpi-score-circle').className = `w-12 h-12 rounded-full border-4 flex items-center justify-center text-xl ${cBorder}`;
+
+            document.getElementById('kpi-usage-top').textContent = `${usageH}h ${usageM}m`;
+            document.getElementById('kpi-usage-top').className = `kpi-value ${usageMins >= 240 ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('kpi-ahi-top').textContent = ahi.toFixed(1);
+            document.getElementById('kpi-ahi-top').className = `kpi-value ${ahi < 5 ? 'text-green-400' : ahi < 15 ? 'text-yellow-400' : 'text-red-400'}`;
+            document.getElementById('kpi-leak-top').textContent = leak.toFixed(1);
+            document.getElementById('kpi-leak-top').className = `kpi-value ${leak <= 24 ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('kpi-mask-top').textContent = Math.round(maskEvents);
+            document.getElementById('kpi-pressure-top').textContent = pressure.toFixed(1);
+
+            if (miData.sleep && miData.sleep.total_duration_min && miData.sleep.total_duration_min.length > 0) {
+                const miDates = miData.sleep.report_date || [];
+                let miIdx = miDates.length > 0 ? miDates.length - 1 : -1;
+                if (globalSelectedDate) {
+                    const foundMiIdx = miDates.indexOf(globalSelectedDate);
+                    if (foundMiIdx !== -1) miIdx = foundMiIdx;
+                    else miIdx = -1; // No miData for this date
+                }
+                
+                const total = miIdx >= 0 ? (miData.sleep.total_duration_min[miIdx] || 0) : 0;
+                const rem = miIdx >= 0 ? (miData.sleep.rem_min[miIdx] || 0) : 0;
+                const deep = miIdx >= 0 ? (miData.sleep.deep_min[miIdx] || 0) : 0;
+                const light = miIdx >= 0 ? (miData.sleep.light_min[miIdx] || 0) : 0;
+                const awake = miIdx >= 0 ? (miData.sleep.awake_min[miIdx] || 0) : 0;
+                const sleepScore = miIdx >= 0 && miData.sleep.sleep_score ? Math.round(miData.sleep.sleep_score[miIdx]) : 0;
+                
+                let sText = sleepScore >= 80 ? 'Excelente' : sleepScore >= 60 ? 'Bom' : 'Ruim';
+                let sColor = sleepScore >= 80 ? 'text-green-500' : sleepScore >= 60 ? 'text-blue-500' : 'text-orange-500';
+                let sBorder = sleepScore >= 80 ? 'border-green-500' : sleepScore >= 60 ? 'border-blue-500' : 'border-orange-500';
+
+                document.getElementById('kpi-mif-score').textContent = sleepScore;
+                document.getElementById('kpi-mif-score-text').textContent = sText;
+                document.getElementById('kpi-mif-score-text').className = `font-bold text-lg leading-tight ${sColor}`;
+                document.getElementById('kpi-mif-score-circle').className = `w-12 h-12 rounded-full border-4 flex items-center justify-center text-xl ${sBorder}`;
+                
+                document.getElementById('kpi-mif-total').textContent = formatHoursMinutes(total);
+                document.getElementById('kpi-mif-rem').textContent = formatHoursMinutes(rem);
+                document.getElementById('kpi-mif-deep').textContent = formatHoursMinutes(deep);
+                document.getElementById('kpi-mif-light').textContent = formatHoursMinutes(light);
+                document.getElementById('kpi-mif-awake').textContent = formatHoursMinutes(awake);
+            }
+        }
+
+        function updateAverages(data, miData) {
+            const ts = data.timeseries;
+            const dates = ts.data_sessao || [];
+            
+            let endIdx = dates.length;
+            if (globalSelectedDate) {
+                const foundIdx = dates.indexOf(globalSelectedDate);
+                if (foundIdx !== -1) endIdx = foundIdx + 1;
+            }
+            
+            let startIdx = Math.max(0, endIdx - globalSelectedPeriod);
+            const periodDates = dates.slice(startIdx, endIdx);
+            
+            const firstD = periodDates.length > 0 ? periodDates[0] : null;
+            const lastD = periodDates.length > 0 ? periodDates[periodDates.length - 1] : null;
+            if (firstD && lastD) {
+                document.getElementById('resumo-dias-title').textContent = `Últimos ${globalSelectedPeriod} Dias - ${formatDateBR(firstD)} a ${formatDateBR(lastD)}`;
+            }
+            
+            const usage = (ts.usage_mins || []).slice(startIdx, endIdx);
+            const scores = (ts.score || []).slice(startIdx, endIdx);
+            const ahis = (ts.AHI || []).slice(startIdx, endIdx);
+            const leaks = (ts['Leak.95'] || []).slice(startIdx, endIdx);
+            const press = (ts['BlowPress.95'] || []).slice(startIdx, endIdx);
+
+            const avgUsage = usage.length ? usage.reduce((a, b) => a + b, 0) / usage.length / 60 : 0;
+            const avgAhi = ahis.length ? ahis.reduce((a, b) => a + b, 0) / ahis.length : 0;
+            const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+            const avgLeak = leaks.length ? leaks.reduce((a, b) => a + b, 0) / leaks.length : 0;
+            const avgPress = press.length ? press.reduce((a, b) => a + b, 0) / press.length : 0;
+
+            document.getElementById('avg-usage').textContent = avgUsage.toFixed(1);
+            document.getElementById('avg-ahi').textContent = avgAhi.toFixed(1);
+            document.getElementById('avg-leak').textContent = avgLeak.toFixed(1);
+            document.getElementById('avg-pressure').textContent = avgPress.toFixed(1);
+            document.getElementById('avg-score').textContent = Math.round(avgScore);
+
+            if (miData.sleep && miData.sleep.total_duration_min) {
+                const miDates = miData.sleep.report_date || [];
+                let miEndIdx = miDates.length;
+                if (globalSelectedDate) {
+                    const foundMiIdx = miDates.indexOf(globalSelectedDate);
+                    if (foundMiIdx !== -1) miEndIdx = foundMiIdx + 1;
+                    else {
+                        // find closest date before selected
+                        let closest = -1;
+                        for(let i=0; i<miDates.length; i++) {
+                            if (miDates[i] <= globalSelectedDate) closest = i;
+                        }
+                        miEndIdx = closest !== -1 ? closest + 1 : 0;
+                    }
+                }
+                let miStartIdx = Math.max(0, miEndIdx - globalSelectedPeriod);
+                
+                const sleepVals = miData.sleep.total_duration_min.slice(miStartIdx, miEndIdx);
+                const sleepScores = miData.sleep.sleep_score ? miData.sleep.sleep_score.slice(miStartIdx, miEndIdx) : [];
+                const rems = (miData.sleep.rem_min || []).slice(miStartIdx, miEndIdx);
+                const deeps = (miData.sleep.deep_min || []).slice(miStartIdx, miEndIdx);
+                const lights = (miData.sleep.light_min || []).slice(miStartIdx, miEndIdx);
+                const awakes = (miData.sleep.awake_min || []).slice(miStartIdx, miEndIdx);
+
+                const avgSleep = sleepVals.length ? sleepVals.reduce((a, b) => a + b, 0) / sleepVals.length / 60 : 0;
+                const avgSleepScore = sleepScores.length ? sleepScores.reduce((a, b) => a + b, 0) / sleepScores.length : 0;
+                const avgRem = rems.length ? rems.reduce((a, b) => a + b, 0) / rems.length / 60 : 0;
+                const avgDeep = deeps.length ? deeps.reduce((a, b) => a + b, 0) / deeps.length / 60 : 0;
+                const avgLight = lights.length ? lights.reduce((a, b) => a + b, 0) / lights.length / 60 : 0;
+                const avgAwake = awakes.length ? awakes.reduce((a, b) => a + b, 0) / awakes.length / 60 : 0;
+
+                document.getElementById('avg-sleep').textContent = avgSleep.toFixed(1);
+                document.getElementById('avg-sleepscore').textContent = Math.round(avgSleepScore);
+                document.getElementById('avg-rem').textContent = avgRem.toFixed(1);
+                document.getElementById('avg-deep').textContent = avgDeep.toFixed(1);
+                document.getElementById('avg-light').textContent = avgLight.toFixed(1);
+                document.getElementById('avg-awake').textContent = avgAwake.toFixed(1);
+            }
+        }
+
+        function renderGraficosCharts(data, miData) {
+            const ts = data.timeseries;
+            const fullDates = ts.data_sessao || [];
+
+            // Determine which month to show: use globalSelectedDate's month if set, else currentMonth/currentYear
+            let refMonth = currentMonth;
+            let refYear = currentYear;
+            if (globalSelectedDate) {
+                const parts = globalSelectedDate.split('-');
+                refYear = parseInt(parts[0]);
+                refMonth = parseInt(parts[1]);
+            }
+
+            // Filter all dates that belong to the selected month/year
+            let monthDates = fullDates;
+            if (refMonth && refYear) {
+                monthDates = fullDates.filter(d => {
+                    const parts = d.split('-');
+                    return parseInt(parts[0]) === refYear && parseInt(parts[1]) === refMonth;
+                });
+            }
+
+            // If no dates for that month, fall back to last 30 days
+            if (monthDates.length === 0) {
+                monthDates = fullDates.slice(-30);
+            }
+
+            const startIdx = fullDates.indexOf(monthDates[0]);
+            const endIdx = fullDates.indexOf(monthDates[monthDates.length - 1]) + 1;
+
+            const dates = monthDates.map(formatDateBR);
+            const scores = (ts.score || []).slice(startIdx, endIdx);
+            const ahis = (ts.AHI || []).slice(startIdx, endIdx);
+            const leaks = (ts['Leak.95'] || []).slice(startIdx, endIdx);
+            const pressures = (ts['BlowPress.95'] || []).slice(startIdx, endIdx);
+
+            function scoreColor(v) { return v >= 70 ? '#27ae60' : v >= 50 ? '#f39c12' : '#e74c3c'; }
+            function sleepScoreColor(v) { return v >= 70 ? '#27ae60' : v >= 50 ? '#f39c12' : '#e74c3c'; }
+            function ahiColor(v) { return v < 5 ? '#27ae60' : v < 15 ? '#f39c12' : '#e74c3c'; }
+            function presColor(v) { return '#27ae60'; } // Image shows all green for pressure
+            function leakColor(v) { return '#27ae60'; }
+
+            const commonOptions = {
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [4, 4] }, beginAtZero: true }, 
+                    x: { grid: { display: false } } 
+                },
+                layout: { padding: { top: 20 } }
+            };
+
+            // Score CPAP
+            createChart('chartScore', 'bar', {
+                labels: dates,
+                datasets: [{ data: scores, backgroundColor: scores.map(scoreColor), borderRadius: 2, barPercentage: 0.8 }]
+            }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 100 } }});
+
+            // Sleep Score
+            let sleepScores = [];
+            let sleepLabels = [];
+            if (miData.sleep && miData.sleep.sleep_score) {
+                const miDates = miData.sleep.report_date || [];
+                const chartDates = fullDates.slice(startIdx, endIdx);
+                sleepScores = chartDates.map(d => {
+                    const idx = miDates.indexOf(d);
+                    return idx >= 0 ? miData.sleep.sleep_score[idx] : null;
+                }).filter(v => v !== null);
+                sleepLabels = chartDates.filter((_, i) => {
+                    const idx = miDates.indexOf(chartDates[i]);
+                    return idx >= 0 && miData.sleep.sleep_score[idx] != null;
+                }).map(formatDateBR);
+            }
+            if (sleepLabels.length > 0) {
+                createChart('chartSleepScore', 'bar', {
+                    labels: sleepLabels,
+                    datasets: [{ data: sleepScores, backgroundColor: sleepScores.map(sleepScoreColor), borderRadius: 2, barPercentage: 0.8 }]
+                }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 100 } }});
+            }
+
+            // IAH
+            createChart('chartAhi', 'bar', {
+                labels: dates,
+                datasets: [{ data: ahis, backgroundColor: ahis.map(ahiColor), borderRadius: 2, barPercentage: 0.8 }]
+            }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 20 } }});
+
+            // Pressão
+            createChart('chartPressure', 'bar', {
+                labels: dates,
+                datasets: [{ data: pressures, backgroundColor: pressures.map(presColor), borderRadius: 2, barPercentage: 0.8 }]
+            }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 12 } }});
+        }
+
+        document.getElementById('patientSelect').addEventListener('change', (e) => {
+            loadPatientData(e.target.value);
+            loadAvailablePeriods(e.target.value);
+        });
+
+        fetchPatients();
+    </script>
+</body>
+</html>

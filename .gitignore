@@ -1,0 +1,49 @@
+# Dados pessoais do paciente — NUNCA commitar
+data/cpap_sd/
+data/Smartband/
+data/processed/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Ambiente virtual
+venv/
+.venv/
+env/
+.env/
+
+# Scripts de desenvolvimento temporários
+scripts/update_html.py
+scripts/update_tooltips.py
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.opencode/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Relatórios e arquivos temporários
+task/
+*.tmp
+*.bak
+
+# Parquet / arquivos binários gerados
+*.parquet
+*.snappy.parquet

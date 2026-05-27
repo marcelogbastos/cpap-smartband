@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Apneia do Sono — Demonstração</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<style>
+body { background:#0e1117; color:white; font-family:'Segoe UI',sans-serif; }
+.card { background:#1e2130; border-radius:8px; padding:10px; margin-bottom:8px; box-shadow:0 4px 6px rgba(0,0,0,0.3); }
+.kpi-title { font-size:11px; opacity:0.7; margin-bottom:6px; }
+.kpi-value { font-size:22px; font-weight:700; }
+.kpi-unit { font-size:10px; opacity:0.5; }
+#lock-screen { position:fixed; inset:0; background:#0e1117; z-index:9999; display:flex; align-items:center; justify-content:center; }
+#lock-screen.show { display:flex; }
+#lock-screen.hide { display:none; }
+.info-btn {
+    display:inline-flex; width:18px; height:18px; border-radius:50%;
+    background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);
+    font-size:11px; line-height:18px; text-align:center;
+    cursor:pointer; transition:all .2s; margin-left:4px;
+    align-items:center; justify-content:center; vertical-align:middle;
+}
+.info-btn:hover { background:rgba(255,255,255,0.25); color:white; }
+.info-popup {
+    display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    background:#1e2130; border:1px solid rgba(255,255,255,0.15);
+    border-radius:12px; padding:20px; z-index:100; max-width:340px; width:90%;
+    box-shadow:0 16px 48px rgba(0,0,0,0.6);
+}
+.info-popup.show { display:block; }
+.info-popup h3 { margin:0 0 6px; font-size:15px; }
+.info-popup p { margin:0; font-size:13px; opacity:0.8; line-height:1.5; }
+.info-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
+.info-overlay.show { display:block; }
+</style>
+</head>
+<body>
+
+<div id="lock-screen">
+    <div class="card text-center" style="max-width:360px;width:90%;padding:30px;">
+        <div style="font-size:40px;margin-bottom:10px;">🔒</div>
+        <h2 class="text-lg font-semibold mb-1">Dashboard Apneia do Sono</h2>
+        <p class="text-sm opacity-60 mb-4">Demonstração protegida — insira a senha</p>
+        <input id="pwd" type="password" placeholder="Senha"
+            class="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-white text-sm mb-3 outline-none focus:border-blue-500"
+            onkeydown="if(event.key==='Enter')unlock()">
+        <button onclick="unlock()"
+            class="w-full py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition">
+            Desbloquear
+        </button>
+        <p id="pwd-err" class="text-red-400 text-xs mt-2 hidden">Senha incorreta</p>
+    </div>
+</div>
+
+<div id="app" style="display:none;padding:10px;max-width:1200px;margin:0 auto;">
+    <h1 class="text-xl font-light mb-4">Dashboard Apneia do Sono</h1>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 mb-2" id="kpis">
+        <div class="card text-center"><div class="kpi-title">Uso</div><div id="k-usage" class="kpi-value text-green-400">--</div><div class="kpi-unit">horas</div></div>
+        <div class="card text-center"><div class="kpi-title">IAH</div><div id="k-ahi" class="kpi-value text-green-400">--</div><div class="kpi-unit">eventos/h</div></div>
+        <div class="card text-center"><div class="kpi-title">Fuga 95%</div><div id="k-leak" class="kpi-value">--</div><div class="kpi-unit">L/min</div></div>
+        <div class="card text-center"><div class="kpi-title">Pressão P95</div><div id="k-pressure" class="kpi-value">--</div><div class="kpi-unit">cmH2O</div></div>
+        <div class="card text-center"><div class="kpi-title">Score</div><div id="k-score" class="kpi-value text-yellow-400">--</div><div class="kpi-unit">pts</div></div>
+        <div class="card text-center"><div class="kpi-title">Sono Total</div><div id="k-sleep" class="kpi-value text-blue-400">--</div><div class="kpi-unit">horas</div></div>
+        <div class="card text-center"><div class="kpi-title">Score Sono</div><div id="k-sleepscore" class="kpi-value text-purple-400">--</div><div class="kpi-unit">pts</div></div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-2" id="charts"></div>
+
+    <div class="card"><h2 class="text-sm font-semibold mb-2">Tabela CPAP — Mensal</h2>
+    <div class="overflow-x-auto"><table class="w-full text-xs text-left text-gray-300">
+    <thead class="bg-gray-700 text-gray-200 uppercase"><tr>
+        <th class="px-2 py-1">Data</th><th class="px-2 py-1">Uso</th><th class="px-2 py-1">IAH</th>
+        <th class="px-2 py-1">Fuga</th><th class="px-2 py-1">Eventos</th><th class="px-2 py-1">Score</th>
+        <th class="px-2 py-1">Pressão</th><th class="px-2 py-1">Vol.Tidal</th>
+        <th class="px-2 py-1">Vent.Min</th><th class="px-2 py-1">Freq.Resp</th><th class="px-2 py-1">P95 Pressão</th>
+    </tr></thead>
+    <tbody id="cpap-table"></tbody></table></div></div>
+
+    <div class="card"><h2 class="text-sm font-semibold mb-2">Tabela Sono — Mensal</h2>
+    <div class="overflow-x-auto"><table class="w-full text-xs text-left text-gray-300">
+    <thead class="bg-gray-700 text-gray-200 uppercase"><tr>
+        <th class="px-2 py-1">Data</th><th class="px-2 py-1">Duração</th><th class="px-2 py-1">REM</th>
+        <th class="px-2 py-1">Profundo</th><th class="px-2 py-1">Leve</th><th class="px-2 py-1">Acordado</th><th class="px-2 py-1">Score</th>
+    </tr></thead>
+    <tbody id="sleep-table"></tbody></table></div></div>
+</div>
+
+<div class="info-overlay" id="infoOverlay" onclick="closeInfo()"></div>
+<div class="info-popup" id="infoPopup"><h3 id="infoTitle">--</h3><p id="infoDesc">--</p></div>
+
+<script>
+const ENCRYPTED = "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";
+
+async function deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
+    return crypto.subtle.deriveBits({name:'PBKDF2', salt, iterations:100000, hash:'SHA-256'}, key, 256);
+}
+
+async function decrypt(encrypted, password) {
+    const raw = Uint8Array.from(atob(encrypted), c=>c.charCodeAt(0));
+    const salt = raw.slice(0,16);
+    const data = raw.slice(16);
+    const key = new Uint8Array(await deriveKey(password, salt));
+    const out = [];
+    for(let i=0;i<data.length;i++) out.push(data[i] ^ key[i%32]);
+    return new TextDecoder().decode(new Uint8Array(out));
+}
+
+let DATA = null;
+
+async function unlock() {
+    const pwd = document.getElementById('pwd');
+    const err = document.getElementById('pwd-err');
+    err.classList.add('hidden');
+    try {
+        const json = await decrypt(ENCRYPTED, pwd.value);
+        DATA = JSON.parse(json);
+        document.getElementById('lock-screen').classList.add('hide');
+        document.getElementById('app').style.display = 'block';
+        renderAll();
+    } catch(e) {
+        err.classList.remove('hidden');
+        pwd.value = '';
+        pwd.focus();
+    }
+}
+
+function closeInfo() {
+    document.getElementById('infoPopup').classList.remove('show');
+    document.getElementById('infoOverlay').classList.remove('show');
+}
+
+function showInfo(title, desc) {
+    document.getElementById('infoTitle').textContent = title;
+    document.getElementById('infoDesc').innerHTML = desc;
+    document.getElementById('infoPopup').classList.add('show');
+    document.getElementById('infoOverlay').classList.add('show');
+}
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.info-btn');
+    if (btn) { showInfo(btn.dataset.title, btn.dataset.desc); return; }
+    if (e.target.closest('#infoPopup')) return;
+    closeInfo();
+});
+
+function formatHours(m) { var h = Math.floor(m/60); var min = Math.round(m%60); return h + 'h' + (min>0?min+'m':''); }
+function scoreColor(v) { return v >= 70 ? 'text-green-400' : v >= 50 ? 'text-yellow-400' : 'text-red-400'; }
+function ahiColor(v) { return v < 5 ? 'text-green-400' : v < 15 ? 'text-yellow-400' : 'text-red-400'; }
+function pressureColor(v) { return v <= 12 ? '#27ae60' : v <= 16 ? '#f39c12' : '#e74c3c'; }
+function leakColor(v) { return v <= 24 ? '#27ae60' : '#e74c3c'; }
+
+function renderAll() {
+    const k = DATA.kpis || {};
+    document.getElementById('k-usage').textContent = k.usage_mins ? (k.usage_mins/60).toFixed(1) : '--';
+    document.getElementById('k-ahi').textContent = k.ahi ? k.ahi.toFixed(1) : '--';
+    document.getElementById('k-leak').textContent = k.leak_95 ? k.leak_95.toFixed(1) : '--';
+    document.getElementById('k-pressure').textContent = k.pressure ? k.pressure.toFixed(1) : '--';
+    document.getElementById('k-score').textContent = k.score ?? '--';
+    document.getElementById('k-sleep').textContent = DATA.sleepKpi ? (DATA.sleepKpi/60).toFixed(1) : '--';
+    document.getElementById('k-sleepscore').textContent = DATA.sleepScoreKpi ?? '--';
+
+    renderCharts();
+    renderCpapTable();
+    renderSleepTable();
+}
+
+function renderCharts() {
+    const ts = DATA.timeseries || {};
+    const dates = (ts.data_sessao || []).slice().reverse();
+    const usage = (ts.usage_mins || []).slice().reverse().map(v=>v/60);
+    const scores = (ts.score || []).slice().reverse();
+    const ahis = (ts.ahi || []).slice().reverse();
+    const leaks = (ts.leak_95 || []).slice().reverse();
+    const pressures = (ts.pressure || []).slice().reverse();
+
+    const container = document.getElementById('charts');
+    const datasets = [
+        { id:'chartScore', label:'Pontuação CPAP', data:scores, max:100, colors:scores.map(v=>v>=70?'#27ae60':v>=50?'#f39c12':'#e74c3c'), info:'Score myAir (0–100).<br>Verde (≥70): bom<br>Amarelo (50–70): regular<br>Vermelho (&lt;50): abaixo da meta.' },
+        { id:'chartAhi', label:'IAH (eventos/h)', data:ahis, colors:ahis.map(v=>v<5?'#27ae60':v<15?'#f39c12':'#e74c3c'), info:'Índice de Apneia-Hipopneia.<br>Verde (&lt;5): normal<br>Amarelo (5–15): leve<br>Vermelho (&gt;15): fora da meta.' },
+        { id:'chartPressure', label:'Pressão (cmH₂O)', data:pressures, colors:pressures.map(v=>pressureColor(v)), info:'Pressão do CPAP P95.<br>Verde (≤12): confortável<br>Amarelo (12–16): elevada<br>Vermelho (&gt;16): alta.' },
+        { id:'chartLeak', label:'Fuga (L/min)', data:leaks, colors:leaks.map(v=>leakColor(v)), info:'Vazamento P95.<br>Verde (≤24): ok<br>Vermelho (&gt;24): excessivo.' },
+        { id:'chartUsage', label:'Uso (horas)', data:usage, colors:'#3498db', info:'Tempo de uso do CPAP por noite.' },
+    ];
+
+    container.innerHTML = '';
+    datasets.forEach(d => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '8px';
+        div.innerHTML = `<div class="kpi-title" style="margin-bottom:4px;">${d.label} <span class="info-btn" data-title="${d.label}" data-desc="${d.info}">?</span></div><div class="h-32 relative"><canvas id="${d.id}"></canvas></div>`;
+        container.appendChild(div);
+    });
+
+    setTimeout(() => {
+        datasets.forEach(d => {
+            const ctx = document.getElementById(d.id);
+            if (!ctx) return;
+            new Chart(ctx, {
+                type: 'bar',
+                data: { labels: dates, datasets: [{ label: d.label, data: d.data, backgroundColor: d.colors, borderRadius: 4 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, datalabels: { display: false } },
+                    scales: { y: { beginAtZero: true, max: d.max || undefined, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { grid: { display: false } } }
+                }
+            });
+        });
+    }, 50);
+}
+
+function renderCpapTable() {
+    const rows = DATA.cpapRows || [];
+    document.getElementById('cpap-table').innerHTML = rows.length
+        ? rows.map(r => `<tr class="border-b border-gray-700 hover:bg-gray-50">${[
+            r.data_sessao,
+            r.usage_mins ? Math.round(r.usage_mins/60)+'h' : '--',
+            `<span class="${ahiColor(r.ahi)}">${(r.ahi||0).toFixed(1)}</span>`,
+            (r.leak_95||0).toFixed(1),
+            Math.round(r.mask_events||0),
+            `<span class="${scoreColor(r.score)} font-semibold">${r.score||0}</span>`,
+            (r.pressure||0).toFixed(1),
+            (r.tidal_volume||0).toFixed(0),
+            (r.minute_ventilation||0).toFixed(1),
+            (r.breath_rate||0).toFixed(1),
+            (r.p95_pressure||0).toFixed(1)
+        ].map(c => `<td class="px-2 py-1">${c}</td>`).join('')}</tr>`).join('')
+        : '<tr><td colspan="11" class="px-2 py-1 text-center text-gray-500">Sem dados</td></tr>';
+}
+
+function renderSleepTable() {
+    const rows = DATA.sleepRows || [];
+    document.getElementById('sleep-table').innerHTML = rows.length
+        ? rows.map(r => `<tr class="border-b border-gray-700 hover:bg-gray-50">${[
+            r.report_date,
+            r.total_duration_min ? Math.round(r.total_duration_min/60)+'h'+Math.round(r.total_duration_min%60)+'m' : '--',
+            r.rem_min ? Math.round(r.rem_min)+'m' : '--',
+            r.deep_min ? Math.round(r.deep_min)+'m' : '--',
+            r.light_min ? Math.round(r.light_min)+'m' : '--',
+            r.awake_min ? Math.round(r.awake_min)+'m' : '--',
+            r.sleep_score ?? '--'
+        ].map(c => `<td class="px-2 py-1">${c}</td>`).join('')}</tr>`).join('')
+        : '<tr><td colspan="7" class="px-2 py-1 text-center text-gray-500">Sem dados</td></tr>';
+}
+</script>
+</body>
+</html>
