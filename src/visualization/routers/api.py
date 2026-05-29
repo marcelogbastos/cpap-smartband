@@ -89,6 +89,8 @@ def get_smartband_daily(patient: str, start_date: Optional[str] = Query(None), e
                 if not df_p.empty:
                     df_p = df_p.sort_values('report_date')
                     df_p['report_date'] = df_p['report_date'].dt.strftime('%Y-%m-%d')
+                    for col in df_p.select_dtypes(include=['category']).columns:
+                        df_p[col] = df_p[col].astype(str)
                     df_p = df_p.fillna(0)
                     res["sleep"] = df_p.to_dict(orient="list")
                 
@@ -102,6 +104,8 @@ def get_smartband_daily(patient: str, start_date: Optional[str] = Query(None), e
                 if not df_a.empty:
                     df_a = df_a.sort_values('report_date')
                     df_a['report_date'] = df_a['report_date'].dt.strftime('%Y-%m-%d')
+                    for col in df_a.select_dtypes(include=['category']).columns:
+                        df_a[col] = df_a[col].astype(str)
                     df_a = df_a.fillna(0)
                     res["activity"] = df_a.to_dict(orient="list")
                 

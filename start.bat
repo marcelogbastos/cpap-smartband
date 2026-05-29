@@ -24,7 +24,7 @@ call venv\Scripts\activate.bat
 
 REM Instala dependencias
 echo [INFO] Instalando dependencias...
-pip install -r requirements.txt >nul 2>&1
+python -m pip install -r requirements.txt >nul 2>&1
 if errorlevel 1 (
     echo [ERRO] Falha ao instalar dependencias.
     pause

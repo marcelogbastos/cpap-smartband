@@ -3,7 +3,7 @@ param(
     [string]$Patient = "marcelo"
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 function Write-Title($text) {
     Write-Host ""
@@ -40,7 +40,7 @@ if (-Not (Test-Path "venv")) {
 
 # Instala dependências
 Write-Step "Verificando dependencias..."
-pip install -r requirements.txt *> $null
+& ".\venv\Scripts\python.exe" -m pip install -r requirements.txt 2>$null
 if ($LASTEXITCODE -ne 0) { Write-Error "Falha ao instalar dependencias"; exit 1 }
 Write-OK "Dependencias OK"
 

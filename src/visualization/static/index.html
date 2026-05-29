@@ -12,16 +12,16 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
     <style>
-        body { background-color: #0e1117; color: white; font-family: 'Segoe UI', sans-serif; }
-        .card { background-color: #1e2130; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+        body { background-color: #0e1117; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+        .card { background-color: #1e2130; border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); overflow: visible; }
         .kpi-title { font-size: 11px; opacity: 0.7; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 4px; }
         .kpi-value { font-size: 20px; font-weight: bold; margin: 0; }
         .kpi-unit { font-size: 10px; opacity: 0.5; margin-top: 2px; }
-        .tab-btn { padding: 6px 16px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); background: transparent; display: flex; align-items: center; gap: 6px; }
-        .tab-btn:hover { color: white; background: rgba(255,255,255,0.05); }
-        .tab-btn.active { color: white; background: rgba(37, 99, 235, 0.15); border-color: #2563eb; font-weight: 600; }
+        .tab-btn { padding: 8px 20px; cursor: pointer; transition: all 0.2s; font-size: 13px; color: rgba(255,255,255,0.5); background: transparent; display: flex; align-items: center; gap: 6px; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab-btn:hover { color: rgba(255,255,255,0.8); }
+        .tab-btn.active { color: #60a5fa; border-bottom-color: #60a5fa; font-weight: 600; }
         .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        .tab-content.active { display: block; position: relative; z-index: 0; }
         th.sort-asc .sort-icon::after { content: ' ↑'; }
         th.sort-desc .sort-icon::after { content: ' ↓'; }
         th .sort-icon { opacity: 0.4; }
@@ -30,32 +30,28 @@
         select { outline: none; }
         .info-btn {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 14px; height: 14px; border-radius: 50%;
+            width: 20px; height: 20px; border-radius: 50%;
             background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.5);
-            font-size: 9px; font-weight: 700; cursor: help;
-            position: relative; font-style: normal; line-height: 1;
+            font-size: 11px; font-weight: 700; cursor: help;
+            position: absolute; font-style: normal; line-height: 1;
+            z-index: 10;
         }
-        .info-btn:hover { background: rgba(255,255,255,0.25); color: white; }
+        .info-btn:hover { background: rgba(255,255,255,0.25); color: white; z-index: 9999; }
         .info-btn .tooltip {
             visibility: hidden; opacity: 0;
-            position: absolute; bottom: calc(100% + 8px); left: 50%;
+            position: absolute; bottom: calc(100% + 10px); left: 50%;
             transform: translateX(-50%);
-            background: #1e293b; color: #e2e8f0;
+            background: #334155; color: #f1f5f9;
             padding: 10px 14px; border-radius: 8px;
             font-size: 11px; font-weight: 400;
             white-space: normal; width: 270px;
             text-align: left; line-height: 1.5;
-            z-index: 50; pointer-events: none;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-            transition: opacity 0.2s, visibility 0.2s;
-            border: 1px solid rgba(255,255,255,0.08);
+            z-index: inherit; pointer-events: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            transition: opacity 0.15s, visibility 0.15s;
+            border: 1px solid #64748b;
         }
-        .info-btn .tooltip::after {
-            content: ''; position: absolute; top: 100%; left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent; border-top-color: #1e293b;
-        }
-        .info-btn.active .tooltip { visibility: visible; opacity: 1; }
+        .info-btn:hover .tooltip { visibility: visible; opacity: 1; }
         .section-header { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .subsection-header { font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; margin-top: 16px; }
         .custom-select { background-color: #111827; color: #d1d5db; border: 1px solid #374151; border-radius: 6px; padding: 4px 10px; font-size: 13px; }
@@ -86,228 +82,292 @@
     </div>
 
     <div id="tab-resumo" class="tab-content active">
-        <!-- NOITE -->
-        <div class="mb-8">
-            <div class="section-header text-gray-300">
-                <span id="resumo-noite-title">Noite - --/--/----</span>
-                <span class="opacity-70 cursor-pointer hover:opacity-100 transition-opacity ml-2 text-xl" id="btn-calendar" title="Selecionar Data">📅</span>
-                <input type="text" id="datePicker" class="hidden">
-            </div>
-            
-            <div class="subsection-header text-blue-500">● <span class="text-gray-400">CPAP</span></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div class="card flex items-center justify-center gap-4 relative">
-                    <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pontuação myAir (0-100)<br><br><b>Detalhes:</b> Avaliação geral da qualidade do uso do CPAP calculada pela ResMed.</span></i>
-                    <div id="kpi-score-circle" class="w-12 h-12 rounded-full border-4 border-gray-600 flex items-center justify-center text-xl">
-                        ⚙️
+        <!-- LAYOUT PRINCIPAL: 2 colunas -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
+
+            <!-- COLUNA ESQUERDA: NOITE -->
+            <div class="min-w-0">
+                <div class="section-header text-gray-300 mb-2">
+                    <span id="resumo-noite-title">Noite - --/--/----</span>
+                    <span class="opacity-70 cursor-pointer hover:opacity-100 transition-opacity ml-2" id="btn-calendar" title="Selecionar Data">📅</span>
+                    <input type="text" id="datePicker" class="hidden">
+                </div>
+
+                <!-- CPAP Noite -->
+                <div class="subsection-header text-blue-500 mb-1">● <span class="text-gray-400">CPAP</span></div>
+                <div class="grid grid-cols-3 gap-1.5 md:gap-2 mb-2 min-w-0">
+                    <!-- Score -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Pontuação myAir (0–100)<br><br><b>Cálculo:</b> Algoritmo ResMed que combina horas de uso, IAH residual, fuga (Leak 95%) e dias consistentes para gerar uma nota.<br><br><b>Referência Clínica:</b> Quanto maior, melhor a adesão e eficácia da terapia. Mínimo exigido pelas operadoras (ANS): ≥ 70.<br><br><b>Faixas:</b><br>🟢 ≥ 70 — Excelente<br>🟡 50 a 69 — Bom<br>🔴 &lt; 50 — Ruim</span></i>
+                        <div id="kpi-score-circle" class="w-9 h-9 rounded-full border-4 border-gray-600 flex items-center justify-center text-sm mx-auto mb-1">⚙️</div>
+                        <div class="flex items-center justify-center gap-1">
+                            <div class="text-xs opacity-60">CPAP</div>
+                            <div id="kpi-score-text" class="font-bold text-sm text-gray-400">--</div>
+                        </div>
                     </div>
-                    <div class="flex flex-col">
-                        <span id="kpi-score-text" class="text-gray-400 font-bold text-lg leading-tight">--</span>
-                        <span class="text-xs opacity-60">CPAP <span id="kpi-score-top">--</span></span>
+                    <!-- Uso -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Tempo de Uso<br><br><b>Cálculo:</b> Duração total em que a máscara permaneceu em uso com respiração detectada pelo CPAP. Exclui pausas e remoções.<br><br><b>Referência Clínica:</b> Meta ANS/AMS: ≥ 4h por noite para adesão. Critério de abastecimento: ≥ 5h/noite em ≥ 70% das noites (30 dias consecutivos).<br><br>🟢 ≥ 4h — Meta atingida<br>🔴 &lt; 4h — Abaixo da meta</span></i>
+                        <div class="text-xs opacity-60 mb-1">Uso</div>
+                        <div id="kpi-usage-top" class="font-bold text-sm text-green-400">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- IAH -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> IAH — Índice de Apneia-Hipopneia (eventos/hora)<br><br><b>Cálculo:</b> (Total de apneias + hipopneias) ÷ horas de uso do CPAP. Apneia = interrupção do fluxo ≥ 10s. Hipopneia = redução ≥ 30% com dessaturação ≥ 3%.<br><br><b>Referência Clínica:</b> Principal indicador de controle da apneia obstrutiva do sono. A terapia com CPAP busca manter IAH &lt; 5.<br><br>🟢 &lt; 5 — Normal (controlado)<br>🟡 5 a 15 — Leve<br>🔴 &gt; 15 — Moderado / Grave</span></i>
+                        <div class="text-xs opacity-60 mb-1">IAH</div>
+                        <div id="kpi-ahi-top" class="font-bold text-sm text-green-400">--</div>
+                        <div class="text-xs opacity-40">eventos/h</div>
+                    </div>
+                    <!-- Fuga -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Fuga de Ar — P95 (L/min)<br><br><b>Cálculo:</b> Percentil 95 do vazamento. Em 95% da noite o vazamento ficou abaixo deste valor. Medido pelo sensor de fluxo do CPAP.<br><br><b>Referência Clínica:</b> Vazamentos acima do limiar comprometem a manutenção da pressão prescrita, reduzindo a eficácia da terapia.<br><br>🟢 ≤ 24 L/min — Aceitável<br>🔴 &gt; 24 L/min — Excesso de fuga</span></i>
+                        <div class="text-xs opacity-60 mb-1">Fuga</div>
+                        <div id="kpi-leak-top" class="font-bold text-sm text-gray-400">--</div>
+                        <div class="text-xs opacity-40">L/min</div>
+                    </div>
+                    <!-- Máscara -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Eventos de Máscara (remoções)<br><br><b>Cálculo:</b> Número de vezes que a máscara foi removida ou perdeu vedação por ≥ 10s durante a sessão.<br><br><b>Referência Clínica:</b> Remoções frequentes indicam desconforto, má adaptação da máscara ou pressão mal ajustada. Ideal: 0 eventos.<br><br>🟢 0 — Ideal<br>🟡 1 a 3 — Poucas remoções<br>🔴 &gt; 3 — Necessário ajuste</span></i>
+                        <div class="text-xs opacity-60 mb-1">Máscara</div>
+                        <div id="kpi-mask-top" class="font-bold text-sm text-gray-400">--</div>
+                        <div class="text-xs opacity-40">remoções</div>
+                    </div>
+                    <!-- Pressão -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Pressão P95 (cmH₂O)<br><br><b>Cálculo:</b> Percentil 95 da pressão aplicada. Em 95% do tempo a pressão esteve neste valor ou abaixo. CPAPs auto-ajustáveis (APAP) variam entre 4 e 20 cmH₂O.<br><br><b>Referência Clínica:</b> A pressão necessária varia conforme colapsabilidade da via aérea, posição de dormir e estágio do sono. Consulte seu médico para ajuste da faixa de pressão.</span></i>
+                        <div class="text-xs opacity-60 mb-1">Pressão</div>
+                        <div id="kpi-pressure-top" class="font-bold text-sm text-blue-400">--</div>
+                        <div class="text-xs opacity-40">cmH₂O</div>
                     </div>
                 </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Uso da Máscara<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Tempo de Uso<br><br><b>Detalhes:</b> Duração total que a máscara foi utilizada durante a sessão.</span></i></div>
-                    <div id="kpi-usage-top" class="kpi-value text-green-400">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Eventos por Hora<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> IAH (Eventos/Hora)<br><br><b>Detalhes:</b> Número médio de eventos de apneia e hipopneia por hora de sono.</span></i></div>
-                    <div id="kpi-ahi-top" class="kpi-value text-green-400">--</div>
-                    <div class="kpi-unit">IAH</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Fuga<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Fuga de Ar P95<br><br><b>Detalhes:</b> Volume de vazamento de ar pela máscara. (95% do tempo o vazamento foi menor que este valor).</span></i></div>
-                    <div id="kpi-leak-top" class="kpi-value text-gray-400">--</div>
-                    <div class="kpi-unit">L/min</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Eventos Máscara<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Eventos de Máscara<br><br><b>Detalhes:</b> Quantidade de vezes que a máscara foi retirada durante a sessão.</span></i></div>
-                    <div id="kpi-mask-top" class="kpi-value text-gray-400">--</div>
-                    <div class="kpi-unit">remoções</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Pressão<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pressão P95<br><br><b>Detalhes:</b> Pressão atingida ou não ultrapassada durante 95% do tempo da terapia.</span></i></div>
-                    <div id="kpi-pressure-top" class="kpi-value text-blue-400">--</div>
-                    <div class="kpi-unit">cmH₂O</div>
+
+                <!-- Smartband Noite -->
+                <div class="subsection-header text-purple-500 mb-1">● <span class="text-gray-400">Smartband</span></div>
+                <div class="grid grid-cols-3 gap-1.5 md:gap-2 min-w-0">
+                    <!-- Score Sono -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Score do Sono (0–100)<br><br><b>Cálculo:</b> Algoritmo da smartband que pondera duração total, eficiência (tempo dormido ÷ tempo na cama × 100), proporção de estágios (REM, Profundo, Leve) e tempo acordado.<br><br><b>Referência Clínica:</b> Sono de qualidade envolve suficiente duração (7–9h para adultos), continuidade e proporção adequada de estágios.<br><br><b>Faixas:</b><br>🟢 ≥ 80 — Excelente<br>🟡 60 a 79 — Bom<br>🔴 &lt; 60 — Ruim</span></i>
+                        <div id="kpi-mif-score-circle" class="w-9 h-9 rounded-full border-4 border-gray-600 flex items-center justify-center text-sm mx-auto mb-1">😴</div>
+                        <div class="flex items-center justify-center gap-1">
+                            <div class="text-xs opacity-60">Score</div>
+                            <div id="kpi-mif-score-text" class="font-bold text-sm text-gray-400">--</div>
+                        </div>
+                    </div>
+                    <!-- Duração -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Duração Total do Sono<br><br><b>Cálculo:</b> Tempo total registrado como dormido, excluindo períodos acordado na cama.<br><br><b>Referência Clínica:</b> A National Sleep Foundation recomenda 7–9h para adultos (18–64 anos) e 7–8h para idosos (≥ 65 anos).<br><br>🟢 7h–9h — Faixa ideal<br>🟡 6h–7h ou &gt; 9h — Aceitável<br>🔴 &lt; 6h — Sono insuficiente</span></i>
+                        <div class="text-xs opacity-60 mb-1">Total</div>
+                        <div id="kpi-mif-total" class="font-bold text-sm text-white">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- REM -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Sono REM — Rapid Eye Movement<br><br><b>Cálculo:</b> Minutos estimados em REM com base nos sensores de movimento e frequência cardíaca da smartband.<br><br><b>Referência Clínica:</b> Fase associada a sonhos vívidos, consolidação da memória e regulação emocional. Ideal: 20–25% do total de sono. Proporção reduzida pode indicar sono fragmentado.</span></i>
+                        <div class="text-xs opacity-60 mb-1">REM</div>
+                        <div id="kpi-mif-rem" class="font-bold text-sm text-yellow-500">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- Profundo -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Sono Profundo — Slow Wave Sleep (N3)<br><br><b>Cálculo:</b> Minutos estimados em sono profundo por sensores da smartband.<br><br><b>Referência Clínica:</b> Fase mais restauradora do sono, essencial para recuperação física, reparação tecidual e liberação do hormônio do crescimento (GH). Ideal: 15–20% do total de sono.</span></i>
+                        <div class="text-xs opacity-60 mb-1">Profundo</div>
+                        <div id="kpi-mif-deep" class="font-bold text-sm text-blue-500">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- Leve -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Sono Leve — Estágios N1 e N2<br><br><b>Cálculo:</b> Minutos estimados em sono leve pela smartband.<br><br><b>Referência Clínica:</b> Corresponde a aproximadamente 50% do total de sono noturno. É a fase de transição entre a vigília e o sono profundo. Predomínio excessivo pode indicar sono de baixa qualidade.</span></i>
+                        <div class="text-xs opacity-60 mb-1">Leve</div>
+                        <div id="kpi-mif-light" class="font-bold text-sm text-orange-400">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- Acordado -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Tempo Acordado<br><br><b>Cálculo:</b> Total de minutos acordado durante a noite, incluindo latência inicial (tempo para adormecer) e despertares noturnos.<br><br><b>Referência Clínica:</b> O ideal é que o tempo acordado represente &lt; 10% do tempo total de cama. Valores elevados indicam insônia de manutenção ou fragmentação do sono.</span></i>
+                        <div class="text-xs opacity-60 mb-1">Acordado</div>
+                        <div id="kpi-mif-awake" class="font-bold text-sm text-purple-400">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="subsection-header text-purple-500">● <span class="text-gray-400">Smartband</span></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div class="card flex items-center justify-center gap-4 relative">
-                    <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Score do Sono<br><br><b>Detalhes:</b> Pontuação geral de qualidade do sono medida pela Smartband.</span></i>
-                    <div id="kpi-mif-score-circle" class="w-12 h-12 rounded-full border-4 border-gray-600 flex items-center justify-center text-xl">
-                        😴
-                    </div>
-                    <div class="flex flex-col">
-                        <span id="kpi-mif-score-text" class="text-gray-400 font-bold text-lg leading-tight">--</span>
-                        <span class="text-xs opacity-60">Score <span id="kpi-mif-score">--</span></span>
-                    </div>
+            <!-- COLUNA DIREITA: MÉDIAS -->
+            <div class="border-t lg:border-t-0 lg:border-l border-gray-700/50 pt-4 lg:pt-0 lg:pl-6 min-w-0">
+                <div class="section-header text-gray-300 mb-3 flex items-center gap-2 flex-wrap">
+                    <span>Últimos</span>
+                    <select id="periodSelect" class="custom-select text-xs py-0.5">
+                        <option value="7" selected>7 dias</option>
+                        <option value="14">14 dias</option>
+                        <option value="30">30 dias</option>
+                        <option value="0">Mês completo</option>
+                    </select>
+                    <span id="resumo-dias-title"> - --/--/----</span>
                 </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Duração Total<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Duração Total<br><br><b>Detalhes:</b> Tempo total dormindo registrado pela pulseira.</span></i></div>
-                    <div id="kpi-mif-total" class="kpi-value text-white">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">REM<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Sono REM<br><br><b>Detalhes:</b> Fase do sono associada a sonhos e recuperação mental.</span></i></div>
-                    <div id="kpi-mif-rem" class="kpi-value text-yellow-500">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Profundo<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Sono Profundo<br><br><b>Detalhes:</b> Fase mais restauradora do sono para recuperação física.</span></i></div>
-                    <div id="kpi-mif-deep" class="kpi-value text-blue-500">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Leve<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Sono Leve<br><br><b>Detalhes:</b> Fase de transição entre estar acordado e o sono profundo.</span></i></div>
-                    <div id="kpi-mif-light" class="kpi-value text-orange-400">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Acordado<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Tempo Acordado<br><br><b>Detalhes:</b> Total de tempo acordado durante a noite.</span></i></div>
-                    <div id="kpi-mif-awake" class="kpi-value text-purple-400">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-            </div>
-        </div>
 
-        <!-- ÚLTIMOS DIAS -->
-        <div class="mb-4">
-            <div class="section-header text-gray-300">
-                <span id="resumo-dias-title">Últimos 7 Dias - --/--/---- - --/--/----</span>
-            </div>
-            
-            <div class="subsection-header text-blue-500">● <span class="text-gray-400">CPAP</span></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Uso<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Uso Diário<br><br><b>Detalhes:</b> Tempo médio de utilização do CPAP por noite.</span></i></div>
-                    <div id="avg-usage" class="kpi-value text-green-400">--</div>
-                    <div class="kpi-unit">horas</div>
+                <!-- CPAP Médias -->
+                <div class="subsection-header text-blue-500 mb-1">● <span class="text-gray-400">CPAP</span></div>
+                <div class="grid grid-cols-3 gap-1.5 md:gap-2 mb-2 min-w-0">
+                    <!-- Score -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média do Score myAir<br><br><b>Cálculo:</b> Média aritmética da pontuação myAir de todas as noites no período selecionado.<br><br><b>Referência Clínica:</b> A média do período reflete a consistência da adesão e eficácia. Mínimo exigido: ≥ 70.<br><br><b>Faixas:</b><br>🟢 ≥ 70 — Excelente<br>🟡 50 a 69 — Bom<br>🔴 &lt; 50 — Ruim</span></i>
+                        <div id="avg-score-circle" class="w-9 h-9 rounded-full border-4 border-gray-600 flex items-center justify-center text-sm mx-auto mb-1">⚙️</div>
+                        <div class="flex items-center justify-center gap-1">
+                            <div class="text-xs opacity-60">Score</div>
+                            <div id="avg-score-text" class="font-bold text-sm text-green-400">--</div>
+                        </div>
+                    </div>
+                    <!-- Uso -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Uso Diário (horas)<br><br><b>Cálculo:</b> Soma do tempo de uso do CPAP dividido pelo número de noites no período selecionado.<br><br><b>Referência Clínica:</b> A média de uso no período é o principal critério de adesão. ANS: ≥ 5h/noite em ≥ 70% das noites para abastecimento do equipamento.<br><br>🟢 ≥ 4h — Meta mínima<br>🔴 &lt; 4h — Abaixo da meta</span></i>
+                        <div class="text-xs opacity-60 mb-1">Uso</div>
+                        <div id="avg-usage" class="font-bold text-sm text-green-400">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- IAH -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média do IAH (eventos/hora)<br><br><b>Cálculo:</b> Média aritmética do IAH registrado em cada noite do período.<br><br><b>Referência Clínica:</b> Avalia o controle médio dos eventos respiratórios ao longo do período.<br><br>🟢 &lt; 5 — Normal (controlado)<br>🟡 5 a 15 — Leve<br>🔴 &gt; 15 — Moderado / Grave</span></i>
+                        <div class="text-xs opacity-60 mb-1">IAH</div>
+                        <div id="avg-ahi" class="font-bold text-sm text-yellow-500">--</div>
+                        <div class="text-xs opacity-40">eventos/h</div>
+                    </div>
+                    <!-- Fuga -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Fuga P95 (L/min)<br><br><b>Cálculo:</b> Média aritmética do vazamento P95 de todas as noites no período.<br><br><b>Referência Clínica:</b> A média de fuga indica a qualidade da vedação da máscara ao longo dos dias. Acima de 24 L/min a terapia perde eficácia.<br><br>🟢 ≤ 24 L/min — Aceitável<br>🔴 &gt; 24 L/min — Excesso de fuga</span></i>
+                        <div class="text-xs opacity-60 mb-1">Fuga</div>
+                        <div id="avg-leak" class="font-bold text-sm text-gray-300">--</div>
+                        <div class="text-xs opacity-40">L/min</div>
+                    </div>
+                    <!-- Máscara -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Eventos de Máscara (remoções)<br><br><b>Cálculo:</b> Média aritmética de eventos de máscara por noite no período.<br><br><b>Referência Clínica:</b> Média elevada indica desconforto recorrente ou má adaptação da máscara.<br><br>🟢 0 — Ideal<br>🟡 1 a 3 — Poucas remoções<br>🔴 &gt; 3 — Necessário ajuste</span></i>
+                        <div class="text-xs opacity-60 mb-1">Máscara</div>
+                        <div id="avg-mask" class="font-bold text-sm text-gray-400">--</div>
+                        <div class="text-xs opacity-40">remoções</div>
+                    </div>
+                    <!-- Pressão -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Pressão P95 (cmH₂O)<br><br><b>Cálculo:</b> Média aritmética da pressão P95 no período.<br><br><b>Referência Clínica:</b> A pressão média reflete a necessidade de suporte ventilatório do paciente. Variações grandes entre noites podem indicar mudança na colapsabilidade da via aérea (ex.: ganho de peso, alergias, posição de dormir).</span></i>
+                        <div class="text-xs opacity-60 mb-1">Pressão</div>
+                        <div id="avg-pressure" class="font-bold text-sm text-blue-400">--</div>
+                        <div class="text-xs opacity-40">cmH₂O</div>
+                    </div>
                 </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média IAH<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média do IAH<br><br><b>Detalhes:</b> Índice de apneia e hipopneia médio no período selecionado.</span></i></div>
-                    <div id="avg-ahi" class="kpi-value text-yellow-500">--</div>
-                    <div class="kpi-unit">eventos/h</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Fuga<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Fuga (P95)<br><br><b>Detalhes:</b> Valor médio do vazamento de ar (P95) no período.</span></i></div>
-                    <div id="avg-leak" class="kpi-value text-gray-300">--</div>
-                    <div class="kpi-unit">L/min</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Pressão<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Pressão (P95)<br><br><b>Detalhes:</b> Valor médio da pressão (P95) aplicada durante o período.</span></i></div>
-                    <div id="avg-pressure" class="kpi-value text-blue-400">--</div>
-                    <div class="kpi-unit">cmH₂O</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Score<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média do Score myAir<br><br><b>Detalhes:</b> Pontuação média de avaliação da terapia no período.</span></i></div>
-                    <div id="avg-score" class="kpi-value text-green-400">--</div>
-                    <div class="kpi-unit">pontos</div>
+
+                <!-- Smartband Médias -->
+                <div class="subsection-header text-purple-500 mb-1">● <span class="text-gray-400">Smartband</span></div>
+                <div class="grid grid-cols-3 gap-1.5 md:gap-2 min-w-0">
+                    <!-- Score Sono -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média do Score do Sono (0–100)<br><br><b>Cálculo:</b> Média aritmética da pontuação de sono registrada pela smartband no período.<br><br><b>Referência Clínica:</b> A média do período indica a qualidade global do sono ao longo dos dias.<br><br><b>Faixas:</b><br>🟢 ≥ 80 — Excelente<br>🟡 60 a 79 — Bom<br>🔴 &lt; 60 — Ruim</span></i>
+                        <div id="avg-sleepscore-circle" class="w-9 h-9 rounded-full border-4 border-gray-600 flex items-center justify-center text-sm mx-auto mb-1">😴</div>
+                        <div class="flex items-center justify-center gap-1">
+                            <div class="text-xs opacity-60">Score</div>
+                            <div id="avg-sleepscore-text" class="font-bold text-sm text-green-400">--</div>
+                        </div>
+                    </div>
+                    <!-- Duração -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Duração do Sono (horas)<br><br><b>Cálculo:</b> Média aritmética do tempo total de sono registrado pela smartband no período.<br><br><b>Referência Clínica:</b> A média de sono no período revela padrões de privação ou excesso. Adultos devem buscar 7–9h.<br><br>🟢 7h–9h — Faixa ideal<br>🟡 6h–7h ou &gt; 9h — Aceitável<br>🔴 &lt; 6h — Sono insuficiente</span></i>
+                        <div class="text-xs opacity-60 mb-1">Total</div>
+                        <div id="avg-sleep" class="font-bold text-sm text-white">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- REM -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Sono REM (horas)<br><br><b>Cálculo:</b> Média aritmética do tempo em REM registrado pela smartband no período.<br><br><b>Referência Clínica:</b> A média de REM no período ajuda a identificar se a proporção esta mantida (ideal: 20–25% do sono total). Redução persistente pode indicar estresse, depressão ou apneia obstrutiva não controlada.</span></i>
+                        <div class="text-xs opacity-60 mb-1">REM</div>
+                        <div id="avg-rem" class="font-bold text-sm text-yellow-500">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- Profundo -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Sono Profundo (horas)<br><br><b>Cálculo:</b> Média aritmética do tempo em sono profundo no período.<br><br><b>Referência Clínica:</b> Adultos saudáveis passam 15–20% do sono em estágio N3. Redução da média pode estar associada a envelhecimento, apneia do sono, estresse crônico ou uso de álcool/benzodiazepínicos.</span></i>
+                        <div class="text-xs opacity-60 mb-1">Profundo</div>
+                        <div id="avg-deep" class="font-bold text-sm text-blue-500">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- Leve -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Sono Leve (horas)<br><br><b>Cálculo:</b> Média aritmética do tempo em sono leve registrado no período.<br><br><b>Referência Clínica:</b> O sono leve corresponde a ~50% do sono total. Se a média de leve estiver muito acima disso, pode indicar fragmentação do sono (incapacidade de aprofundar).</span></i>
+                        <div class="text-xs opacity-60 mb-1">Leve</div>
+                        <div id="avg-light" class="font-bold text-sm text-orange-400">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
+                    <!-- Acordado -->
+                    <div class="card text-center relative p-2" style="min-height:0">
+                        <i class="info-btn absolute top-1 right-1">?<span class="tooltip"><b>Métrica:</b> Média de Tempo Acordado (horas)<br><br><b>Cálculo:</b> Média aritmética do tempo acordado registrado no período.<br><br><b>Referência Clínica:</b> O despertar noturno é normal se breve (&lt; 5 min). A média elevada de tempo acordado indica má eficiência do sono (ideal: &gt; 85%). Pode estar associada a apneia não tratada, estresse ou ambiente inadequado.</span></i>
+                        <div class="text-xs opacity-60 mb-1">Acordado</div>
+                        <div id="avg-awake" class="font-bold text-sm text-purple-400">--</div>
+                        <div class="text-xs opacity-40">horas</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="subsection-header text-purple-500">● <span class="text-gray-400">Smartband</span></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Duração<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Duração do Sono<br><br><b>Detalhes:</b> Tempo médio de sono por noite no período.</span></i></div>
-                    <div id="avg-sleep" class="kpi-value text-white">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Score<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média do Score do Sono<br><br><b>Detalhes:</b> Avaliação média da qualidade do sono no período.</span></i></div>
-                    <div id="avg-sleepscore" class="kpi-value text-green-400">--</div>
-                    <div class="kpi-unit">pontos</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média REM<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Sono REM<br><br><b>Detalhes:</b> Tempo médio passado na fase REM por noite.</span></i></div>
-                    <div id="avg-rem" class="kpi-value text-yellow-500">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Profundo<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Sono Profundo<br><br><b>Detalhes:</b> Tempo médio de sono profundo por noite.</span></i></div>
-                    <div id="avg-deep" class="kpi-value text-blue-500">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Leve<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Sono Leve<br><br><b>Detalhes:</b> Tempo médio de sono leve por noite.</span></i></div>
-                    <div id="avg-light" class="kpi-value text-orange-400">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-                <div class="card text-center relative flex flex-col justify-center items-center">
-                    <div class="kpi-title">Média Acordado<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Média de Tempo Acordado<br><br><b>Detalhes:</b> Tempo médio acordado por noite no período.</span></i></div>
-                    <div id="avg-awake" class="kpi-value text-purple-400">--</div>
-                    <div class="kpi-unit">horas</div>
-                </div>
-            </div>
-        </div>
+        </div><!-- fim grid 2 colunas -->
     </div>
 
     <div id="tab-graficos" class="tab-content">
-        <div class="flex flex-col gap-4">
-            <div class="card">
-                <div class="kpi-title justify-start mb-4">Pontuação CPAP<i class="info-btn absolute top-2 right-2">?<span class="tooltip">Pontuação myAir.</span></i></div>
-                <div class="h-48 relative"><canvas id="chartScore"></canvas></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+            <div class="card relative">
+                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pontuação CPAP — myAir (0–100)<br><br><b>Cálculo:</b> Algoritmo ResMed que pondera horas de uso, IAH residual, fuga P95 e consistência de uso. Plotado por data da sessão.<br><br><b>Interpretação:</b> Acompanhe a evolução diária. Queda súbita pode indicar noite com máscara mal-adaptada, fuga excessiva ou baixo tempo de uso.<br><br><b>Faixas:</b><br>🟢 ≥ 70 — Excelente<br>🟡 50 a 69 — Bom<br>🔴 &lt; 50 — Ruim</span></i>
+                <div class="kpi-title justify-start mb-4">Pontuação CPAP</div>
+                <div class="h-48 relative"><canvas id="chartScore" class="max-w-full"></canvas></div>
             </div>
-            <div class="card">
-                <div class="kpi-title justify-start mb-4">Score Sono<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Score do Sono<br><br><b>Detalhes:</b> Pontuação geral de qualidade do sono medida pela Smartband.</span></i></div>
-                <div class="h-48 relative"><canvas id="chartSleepScore"></canvas></div>
+            <div class="card relative">
+                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Score do Sono — Smartband (0–100)<br><br><b>Cálculo:</b> Algoritmo da smartband que pondera duração total, eficiência (tempo dormido ÷ tempo na cama), proporção de estágios e tempo acordado. Plotado por data.<br><br><b>Interpretação:</b> Comparar com o CPAP Score: discrepâncias podem indicar que a máquina está compensando a apneia mas o sono ainda é fragmentado por outros fatores.<br><br><b>Faixas:</b><br>🟢 ≥ 80 — Excelente<br>🟡 60 a 79 — Bom<br>🔴 &lt; 60 — Ruim</span></i>
+                <div class="kpi-title justify-start mb-4">Score Sono</div>
+                <div class="h-48 relative"><canvas id="chartSleepScore" class="max-w-full"></canvas></div>
             </div>
-            <div class="card">
-                <div class="kpi-title justify-start mb-4">IAH (eventos/h)<i class="info-btn absolute top-2 right-2">?<span class="tooltip">Índice de Apneia-Hipopneia.</span></i></div>
-                <div class="h-48 relative"><canvas id="chartAhi"></canvas></div>
+            <div class="card relative">
+                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> IAH — Índice de Apneia-Hipopneia (eventos/hora)<br><br><b>Cálculo:</b> (Apneias + hipopneias) ÷ horas de uso CPAP. Plotado por data. Apneia = fluxo &lt; 10% por ≥ 10s. Hipopneia = fluxo reduzido ≥ 30% com dessaturação ≥ 3%.<br><br><b>Interpretação:</b> Ideal manter &lt; 5. Picos podem ocorrer por dormir de barriga para cima, consumo de álcool, ou medicações sedativas. Variação noturna ajuda a identificar gatilhos.<br><br>🟢 &lt; 5 — Controlado<br>🟡 5 a 15 — Leve<br>🔴 &gt; 15 — Moderado/Grave</span></i>
+                <div class="kpi-title justify-start mb-4">IAH (eventos/h)</div>
+                <div class="h-48 relative"><canvas id="chartAhi" class="max-w-full"></canvas></div>
             </div>
-            <div class="card">
-                <div class="kpi-title justify-start mb-4">Pressão (cmH₂O)<i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pressão P95<br><br><b>Detalhes:</b> Pressão atingida ou não ultrapassada durante 95% do tempo da terapia.</span></i></div>
-                <div class="h-48 relative"><canvas id="chartPressure"></canvas></div>
+            <div class="card relative">
+                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pressão P95 (cmH₂O)<br><br><b>Cálculo:</b> Percentil 95 da pressão aplicada — em 95% do tempo a pressão ficou ≤ este valor. Plotado por data.<br><br><b>Interpretação:</b> Em APAP (auto-ajustável), a pressão sobe quando há resistência na via aérea. Acompanhar a tendência: aumento progressivo pode indicar piora da apneia (ganho de peso, alergias sazonais). Variação normal: 4–20 cmH₂O.</span></i>
+                <div class="kpi-title justify-start mb-4">Pressão (cmH₂O)</div>
+                <div class="h-48 relative"><canvas id="chartPressure" class="max-w-full"></canvas></div>
             </div>
         </div>
     </div>
 
     <div id="tab-tabelas" class="tab-content">
-        <div class="card mb-4">
-            <h2 class="text-sm font-semibold mb-4 text-gray-300">Distribuição do Sono - Tabela Mensal</h2>
-            <div class="overflow-x-auto">
-                <table id="sleepTable" class="w-full text-xs text-left text-gray-300">
-                    <thead class="text-xs uppercase bg-[#161925] text-gray-300 border-b border-gray-700">
-                        <tr>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="report_date">Data <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="total_duration_min">Duração <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="rem_min">REM <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="deep_min">Profundo <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="light_min">Leve <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="awake_min">Acordado <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="sleep" data-col="rem_pct">% REM <span class="sort-icon">↕</span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="sleepTableBody">
-                        <tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">Carregando dados...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="card">
-            <h2 class="text-sm font-semibold mb-4 text-gray-300">Dados CPAP - Tabela Mensal</h2>
-            <div class="overflow-x-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
+            <div class="card min-w-0 overflow-x-auto">
+                <h2 class="text-xs font-semibold mb-3 text-gray-300">Dados CPAP</h2>
                 <table id="cpapTable" class="w-full text-xs text-left text-gray-300">
                     <thead class="text-xs uppercase bg-[#161925] text-gray-300 border-b border-gray-700">
                         <tr>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="data_sessao">Data <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="usage_mins">Uso <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="ahi">IAH <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="leak_95">Fuga 95% <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="mask_events">Eventos <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="score">Score <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="pressure">Pressão <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="tidal_volume">Vol. Tidal <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="minute_ventilation">Vent. Minuto <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="breath_rate">Freq. Resp. <span class="sort-icon">↕</span></th>
-                            <th class="px-4 py-3 cursor-pointer hover:bg-gray-800 select-none" data-table="cpap" data-col="p95_pressure">P95 Pressão <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="cpap" data-col="data_sessao">Data <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="cpap" data-col="usage_mins">Uso <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="cpap" data-col="ahi">IAH <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="cpap" data-col="pressure">Pressão <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="cpap" data-col="leak_95">Fuga <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="cpap" data-col="score">Score <span class="sort-icon">↕</span></th>
                         </tr>
                     </thead>
                     <tbody id="cpapTableBody">
-                        <tr><td colspan="11" class="px-4 py-3 text-center text-gray-500">Carregando dados...</td></tr>
+                        <tr><td colspan="6" class="px-2 py-2 text-center text-gray-500">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card min-w-0 overflow-x-auto">
+                <h2 class="text-xs font-semibold mb-3 text-gray-300">Distribuição do Sono</h2>
+                <table id="sleepTable" class="w-full text-xs text-left text-gray-300">
+                    <thead class="text-xs uppercase bg-[#161925] text-gray-300 border-b border-gray-700">
+                        <tr>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="report_date">Data <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="total_duration_min">Duração <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="rem_min">REM <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="deep_min">Prof. <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="light_min">Leve <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="awake_min">Acord. <span class="sort-icon">↕</span></th>
+                            <th class="px-2 py-2 cursor-pointer hover:bg-gray-800 select-none whitespace-nowrap" data-table="sleep" data-col="rem_pct">% REM <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="sleepTableBody">
+                        <tr><td colspan="7" class="px-2 py-2 text-center text-gray-500">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -365,34 +425,16 @@
             datePickerInstance.open();
         });
 
-        // Period Buttons
-        document.querySelectorAll('.period-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                globalSelectedPeriod = parseInt(e.target.dataset.period);
-                if (currentPatientData && currentMiData) {
-                    updateAverages(currentPatientData, currentMiData);
-                    renderGraficosCharts(currentPatientData, currentMiData);
-                }
-            });
-        });
-
-        
-        // Tooltip Click Logic
-        document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.info-btn');
-            if (btn) {
-                const isActive = btn.classList.contains('active');
-                document.querySelectorAll('.info-btn.active').forEach(el => el.classList.remove('active'));
-                if (!isActive) {
-                    btn.classList.add('active');
-                }
-            } else {
-                document.querySelectorAll('.info-btn.active').forEach(el => el.classList.remove('active'));
+        // Period Select
+        document.getElementById('periodSelect').addEventListener('change', (e) => {
+            globalSelectedPeriod = parseInt(e.target.value);
+            if (currentPatientData && currentMiData) {
+                updateAverages(currentPatientData, currentMiData);
+                renderGraficosCharts(currentPatientData, currentMiData);
             }
         });
 
+        
         // Tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -466,8 +508,8 @@
             monthSelect.value = currentMonth;
             loadMonthlySleep();
             loadMonthlyCpap();
-            monthSelect.addEventListener('change', (e) => { currentMonth = parseInt(e.target.value); loadMonthlySleep(); loadMonthlyCpap(); });
-            yearSelect.addEventListener('change', (e) => { currentYear = parseInt(e.target.value); loadMonthlySleep(); loadMonthlyCpap(); });
+            monthSelect.addEventListener('change', (e) => { currentMonth = parseInt(e.target.value); loadMonthlySleep(); loadMonthlyCpap(); if (currentPatientData && currentMiData) renderGraficosCharts(currentPatientData, currentMiData); });
+            yearSelect.addEventListener('change', (e) => { currentYear = parseInt(e.target.value); loadMonthlySleep(); loadMonthlyCpap(); if (currentPatientData && currentMiData) renderGraficosCharts(currentPatientData, currentMiData); });
         }
 
         function formatHoursMinutes(mins) {
@@ -542,24 +584,19 @@
         function renderCpapTable(rows) {
             const tbody = document.getElementById('cpapTableBody');
             if (!rows || rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-3 text-center text-gray-500">Sem dados para o período selecionado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="px-2 py-2 text-center text-gray-500">Sem dados para o período selecionado</td></tr>';
                 return;
             }
             tbody.innerHTML = rows.map(row => {
                 const score = row.score || 0;
                 const scoreColor = score >= 70 ? 'text-green-500' : score >= 50 ? 'text-yellow-500' : 'text-red-500';
                 return `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e] transition-colors">
-                    <td class="px-4 py-3 text-gray-400">${row.data_sessao}</td>
-                    <td class="px-4 py-3">${formatHoursMinutes(row.usage_mins)}</td>
-                    <td class="px-4 py-3 text-yellow-500">${(row.ahi||0).toFixed(1)}</td>
-                    <td class="px-4 py-3">${(row.leak_95 || 0).toFixed(1)} L/min</td>
-                    <td class="px-4 py-3">${Math.round(row.mask_events || 0)}</td>
-                    <td class="px-4 py-3 ${scoreColor}">${score}</td>
-                    <td class="px-4 py-3">${(row.pressure || 0).toFixed(1)}</td>
-                    <td class="px-4 py-3">${(row.tidal_volume || 0).toFixed(0)}</td>
-                    <td class="px-4 py-3">${(row.minute_ventilation || 0).toFixed(1)}</td>
-                    <td class="px-4 py-3">${(row.breath_rate || 0).toFixed(1)}</td>
-                    <td class="px-4 py-3">${(row.p95_pressure || 0).toFixed(1)}</td>
+                    <td class="px-2 py-2 text-gray-400 whitespace-nowrap">${row.data_sessao}</td>
+                    <td class="px-2 py-2 whitespace-nowrap">${formatHoursMinutes(row.usage_mins)}</td>
+                    <td class="px-2 py-2 text-yellow-500 whitespace-nowrap">${(row.ahi||0).toFixed(1)}</td>
+                    <td class="px-2 py-2 whitespace-nowrap">${(row.p95_pressure || 0).toFixed(1)}</td>
+                    <td class="px-2 py-2 whitespace-nowrap">${(row.leak_95 || 0).toFixed(1)}</td>
+                    <td class="px-2 py-2 ${scoreColor} whitespace-nowrap">${score}</td>
                 </tr>`;
             }).join('');
         }
@@ -567,7 +604,7 @@
         function renderSleepTable(rows) {
             const tbody = document.getElementById('sleepTableBody');
             if (!rows || rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">Sem dados para o período selecionado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-2 py-2 text-center text-gray-500">Sem dados para o período selecionado</td></tr>';
                 return;
             }
             tbody.innerHTML = rows.map(row => {
@@ -575,13 +612,13 @@
                 const rem = row.rem_min || 0;
                 const remPct = row.rem_pct ? row.rem_pct.toFixed(1) : '0.0';
                 return `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e] transition-colors">
-                    <td class="px-4 py-3 text-gray-400">${row.report_date}</td>
-                    <td class="px-4 py-3">${formatHoursMinutes(total)}</td>
-                    <td class="px-4 py-3 text-yellow-500">${formatHoursDecimal(rem)}</td>
-                    <td class="px-4 py-3 text-blue-500">${formatHoursDecimal(row.deep_min || 0)}</td>
-                    <td class="px-4 py-3 text-orange-400">${formatHoursDecimal(row.light_min || 0)}</td>
-                    <td class="px-4 py-3 text-purple-400">${formatHoursDecimal(row.awake_min || 0)}</td>
-                    <td class="px-4 py-3">${remPct}%</td>
+                    <td class="px-2 py-2 text-gray-400 whitespace-nowrap">${row.report_date}</td>
+                    <td class="px-2 py-2 whitespace-nowrap">${formatHoursMinutes(total)}</td>
+                    <td class="px-2 py-2 text-yellow-500 whitespace-nowrap">${formatHoursDecimal(rem)}</td>
+                    <td class="px-2 py-2 text-blue-500 whitespace-nowrap">${formatHoursDecimal(row.deep_min || 0)}</td>
+                    <td class="px-2 py-2 text-orange-400 whitespace-nowrap">${formatHoursDecimal(row.light_min || 0)}</td>
+                    <td class="px-2 py-2 text-purple-400 whitespace-nowrap">${formatHoursDecimal(row.awake_min || 0)}</td>
+                    <td class="px-2 py-2 whitespace-nowrap">${remPct}%</td>
                 </tr>`;
             }).join('');
         }
@@ -645,21 +682,21 @@
             const usageM = Math.floor(usageMins % 60);
             
             // CPAP Score Logic
-            let cText = cScore >= 70 ? 'Excelente' : cScore >= 50 ? 'Bom' : 'Ruim';
+            let cIcon = cScore >= 70 ? '⭐' : cScore >= 50 ? '👍' : '⚠️';
             let cColor = cScore >= 70 ? 'text-green-500' : cScore >= 50 ? 'text-yellow-500' : 'text-red-500';
             let cBorder = cScore >= 70 ? 'border-green-500' : cScore >= 50 ? 'border-yellow-500' : 'border-red-500';
             
-            document.getElementById('kpi-score-top').textContent = cScore;
-            document.getElementById('kpi-score-text').textContent = cText;
-            document.getElementById('kpi-score-text').className = `font-bold text-lg leading-tight ${cColor}`;
-            document.getElementById('kpi-score-circle').className = `w-12 h-12 rounded-full border-4 flex items-center justify-center text-xl ${cBorder}`;
+            document.getElementById('kpi-score-text').textContent = cScore;
+            document.getElementById('kpi-score-text').className = `font-bold text-sm ${cColor}`;
+            document.getElementById('kpi-score-circle').textContent = cIcon;
+            document.getElementById('kpi-score-circle').className = `w-9 h-9 rounded-full border-4 flex items-center justify-center text-sm mx-auto mb-1 ${cBorder}`;
 
             document.getElementById('kpi-usage-top').textContent = `${usageH}h ${usageM}m`;
-            document.getElementById('kpi-usage-top').className = `kpi-value ${usageMins >= 240 ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('kpi-usage-top').className = `font-bold text-sm ${usageMins >= 240 ? 'text-green-400' : 'text-red-400'}`;
             document.getElementById('kpi-ahi-top').textContent = ahi.toFixed(1);
-            document.getElementById('kpi-ahi-top').className = `kpi-value ${ahi < 5 ? 'text-green-400' : ahi < 15 ? 'text-yellow-400' : 'text-red-400'}`;
+            document.getElementById('kpi-ahi-top').className = `font-bold text-sm ${ahi < 5 ? 'text-green-400' : ahi < 15 ? 'text-yellow-400' : 'text-red-400'}`;
             document.getElementById('kpi-leak-top').textContent = leak.toFixed(1);
-            document.getElementById('kpi-leak-top').className = `kpi-value ${leak <= 24 ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('kpi-leak-top').className = `font-bold text-sm ${leak <= 24 ? 'text-green-400' : 'text-red-400'}`;
             document.getElementById('kpi-mask-top').textContent = Math.round(maskEvents);
             document.getElementById('kpi-pressure-top').textContent = pressure.toFixed(1);
 
@@ -679,14 +716,14 @@
                 const awake = miIdx >= 0 ? (miData.sleep.awake_min[miIdx] || 0) : 0;
                 const sleepScore = miIdx >= 0 && miData.sleep.sleep_score ? Math.round(miData.sleep.sleep_score[miIdx]) : 0;
                 
-                let sText = sleepScore >= 80 ? 'Excelente' : sleepScore >= 60 ? 'Bom' : 'Ruim';
-                let sColor = sleepScore >= 80 ? 'text-green-500' : sleepScore >= 60 ? 'text-blue-500' : 'text-orange-500';
-                let sBorder = sleepScore >= 80 ? 'border-green-500' : sleepScore >= 60 ? 'border-blue-500' : 'border-orange-500';
-
-                document.getElementById('kpi-mif-score').textContent = sleepScore;
-                document.getElementById('kpi-mif-score-text').textContent = sText;
-                document.getElementById('kpi-mif-score-text').className = `font-bold text-lg leading-tight ${sColor}`;
-                document.getElementById('kpi-mif-score-circle').className = `w-12 h-12 rounded-full border-4 flex items-center justify-center text-xl ${sBorder}`;
+                let sIcon = sleepScore >= 80 ? '⭐' : sleepScore >= 60 ? '👍' : '⚠️';
+                let sColor = sleepScore >= 80 ? 'text-green-500' : sleepScore >= 60 ? 'text-yellow-500' : 'text-red-500';
+                let sBorder = sleepScore >= 80 ? 'border-green-500' : sleepScore >= 60 ? 'border-yellow-500' : 'border-red-500';
+                
+                document.getElementById('kpi-mif-score-text').textContent = sleepScore;
+                document.getElementById('kpi-mif-score-text').className = `font-bold text-sm ${sColor}`;
+                document.getElementById('kpi-mif-score-circle').textContent = sIcon;
+                document.getElementById('kpi-mif-score-circle').className = `w-9 h-9 rounded-full border-4 flex items-center justify-center text-sm mx-auto mb-1 ${sBorder}`;
                 
                 document.getElementById('kpi-mif-total').textContent = formatHoursMinutes(total);
                 document.getElementById('kpi-mif-rem').textContent = formatHoursMinutes(rem);
@@ -706,13 +743,22 @@
                 if (foundIdx !== -1) endIdx = foundIdx + 1;
             }
             
-            let startIdx = Math.max(0, endIdx - globalSelectedPeriod);
+            let startIdx;
+            if (globalSelectedPeriod === 0) {
+                startIdx = 0;
+            } else {
+                startIdx = Math.max(0, endIdx - globalSelectedPeriod);
+            }
             const periodDates = dates.slice(startIdx, endIdx);
             
             const firstD = periodDates.length > 0 ? periodDates[0] : null;
             const lastD = periodDates.length > 0 ? periodDates[periodDates.length - 1] : null;
             if (firstD && lastD) {
-                document.getElementById('resumo-dias-title').textContent = `Últimos ${globalSelectedPeriod} Dias - ${formatDateBR(firstD)} a ${formatDateBR(lastD)}`;
+                if (globalSelectedPeriod === 0) {
+                    document.getElementById('resumo-dias-title').textContent = ` - ${formatDateBR(firstD)} a ${formatDateBR(lastD)}`;
+                } else {
+                    document.getElementById('resumo-dias-title').textContent = ` - ${formatDateBR(firstD)} a ${formatDateBR(lastD)}`;
+                }
             }
             
             const usage = (ts.usage_mins || []).slice(startIdx, endIdx);
@@ -720,18 +766,30 @@
             const ahis = (ts.AHI || []).slice(startIdx, endIdx);
             const leaks = (ts['Leak.95'] || []).slice(startIdx, endIdx);
             const press = (ts['BlowPress.95'] || []).slice(startIdx, endIdx);
+            const masks = (ts.mask_events || []).slice(startIdx, endIdx);
 
             const avgUsage = usage.length ? usage.reduce((a, b) => a + b, 0) / usage.length / 60 : 0;
             const avgAhi = ahis.length ? ahis.reduce((a, b) => a + b, 0) / ahis.length : 0;
             const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
             const avgLeak = leaks.length ? leaks.reduce((a, b) => a + b, 0) / leaks.length : 0;
             const avgPress = press.length ? press.reduce((a, b) => a + b, 0) / press.length : 0;
+            const avgMask = masks.length ? masks.reduce((a, b) => a + b, 0) / masks.length : 0;
 
             document.getElementById('avg-usage').textContent = avgUsage.toFixed(1);
             document.getElementById('avg-ahi').textContent = avgAhi.toFixed(1);
             document.getElementById('avg-leak').textContent = avgLeak.toFixed(1);
             document.getElementById('avg-pressure').textContent = avgPress.toFixed(1);
-            document.getElementById('avg-score').textContent = Math.round(avgScore);
+            document.getElementById('avg-mask').textContent = Math.round(avgMask);
+
+            // CPAP Score circle
+            const avgScoreRounded = Math.round(avgScore);
+            const ascIcon = avgScoreRounded >= 70 ? '⭐' : avgScoreRounded >= 50 ? '👍' : '⚠️';
+            const ascColor = avgScoreRounded >= 70 ? 'text-green-500' : avgScoreRounded >= 50 ? 'text-yellow-500' : 'text-red-500';
+            const ascBorder = avgScoreRounded >= 70 ? 'border-green-500' : avgScoreRounded >= 50 ? 'border-yellow-500' : 'border-red-500';
+            document.getElementById('avg-score-text').textContent = avgScoreRounded;
+            document.getElementById('avg-score-text').className = `font-bold text-sm ${ascColor}`;
+            document.getElementById('avg-score-circle').textContent = ascIcon;
+            document.getElementById('avg-score-circle').className = `w-9 h-9 rounded-full border-4 flex items-center justify-center text-sm mx-auto mb-1 ${ascBorder}`;
 
             if (miData.sleep && miData.sleep.total_duration_min) {
                 const miDates = miData.sleep.report_date || [];
@@ -748,7 +806,12 @@
                         miEndIdx = closest !== -1 ? closest + 1 : 0;
                     }
                 }
-                let miStartIdx = Math.max(0, miEndIdx - globalSelectedPeriod);
+                let miStartIdx;
+                if (globalSelectedPeriod === 0) {
+                    miStartIdx = 0;
+                } else {
+                    miStartIdx = Math.max(0, miEndIdx - globalSelectedPeriod);
+                }
                 
                 const sleepVals = miData.sleep.total_duration_min.slice(miStartIdx, miEndIdx);
                 const sleepScores = miData.sleep.sleep_score ? miData.sleep.sleep_score.slice(miStartIdx, miEndIdx) : [];
@@ -765,7 +828,17 @@
                 const avgAwake = awakes.length ? awakes.reduce((a, b) => a + b, 0) / awakes.length / 60 : 0;
 
                 document.getElementById('avg-sleep').textContent = avgSleep.toFixed(1);
-                document.getElementById('avg-sleepscore').textContent = Math.round(avgSleepScore);
+
+                // Smartband Score circle
+                const avgSleepScoreRounded = Math.round(avgSleepScore);
+                const sscIcon = avgSleepScoreRounded >= 80 ? '⭐' : avgSleepScoreRounded >= 60 ? '👍' : '⚠️';
+                const sscColor = avgSleepScoreRounded >= 80 ? 'text-green-500' : avgSleepScoreRounded >= 60 ? 'text-yellow-500' : 'text-red-500';
+                const sscBorder = avgSleepScoreRounded >= 80 ? 'border-green-500' : avgSleepScoreRounded >= 60 ? 'border-yellow-500' : 'border-red-500';
+                document.getElementById('avg-sleepscore-text').textContent = avgSleepScoreRounded;
+                document.getElementById('avg-sleepscore-text').className = `font-bold text-sm ${sscColor}`;
+                document.getElementById('avg-sleepscore-circle').textContent = sscIcon;
+                document.getElementById('avg-sleepscore-circle').className = `w-9 h-9 rounded-full border-4 flex items-center justify-center text-sm mx-auto mb-1 ${sscBorder}`;
+
                 document.getElementById('avg-rem').textContent = avgRem.toFixed(1);
                 document.getElementById('avg-deep').textContent = avgDeep.toFixed(1);
                 document.getElementById('avg-light').textContent = avgLight.toFixed(1);
@@ -777,14 +850,9 @@
             const ts = data.timeseries;
             const fullDates = ts.data_sessao || [];
 
-            // Determine which month to show: use globalSelectedDate's month if set, else currentMonth/currentYear
+            // Use the month/year selected in the dropdowns
             let refMonth = currentMonth;
             let refYear = currentYear;
-            if (globalSelectedDate) {
-                const parts = globalSelectedDate.split('-');
-                refYear = parseInt(parts[0]);
-                refMonth = parseInt(parts[1]);
-            }
 
             // Filter all dates that belong to the selected month/year
             let monthDates = fullDates;
