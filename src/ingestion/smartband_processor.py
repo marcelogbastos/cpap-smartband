@@ -18,12 +18,20 @@ import json
 import argparse
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-import logging
+# Configurar logging com arquivo
+LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(os.path.join(LOGS_DIR, "smartband_processor.log"))
+    ]
+)
 logger = logging.getLogger(__name__)
+
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -35,9 +43,24 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 SMARTBAND_DIR = os.path.join(BASE_DIR, "data", "Smartband")
 PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
 
-# Timezone offset: dados usam timezone=-12 para UTC-3 (Brasília)
-TZ_OFFSET = timedelta(hours=-3)
+# Carrega .env manualmente se existir
+env_path = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_path):
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if "=" in line and not line.strip().startswith("#"):
+                key, val = line.strip().split("=", 1)
+                os.environ[key.strip()] = val.strip().strip('"').strip("'")
+
+# Timezone offset: dados usam fuso horário configurado (default: UTC-3 Brasília)
+try:
+    tz_hours = int(os.environ.get("TZ_OFFSET_HOURS", "-3"))
+except ValueError:
+    tz_hours = -3
+
+TZ_OFFSET = timedelta(hours=tz_hours)
 TZ_BRT = timezone(TZ_OFFSET)
+
 
 
 def find_csv(table_name):
@@ -312,7 +335,7 @@ class SmartbandProcessor:
 
         df_combined['date'] = pd.to_datetime(df_combined['date'])
         df_combined = df_combined.sort_values('timestamp')
-        df_combined['patient'] = 'Marcelo'
+        df_combined['patient'] = self.patient_slug.title()
         save_parquet(df_combined, "smartband_vitals", self.patient_slug)
         return df_combined
 

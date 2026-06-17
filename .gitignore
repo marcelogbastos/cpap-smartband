@@ -1,3 +1,11 @@
+data/
+logs/
+.env
+venv/
+*.edf
+__pycache__/
+*.pyc
+.DS_Store
 # Dados pessoais do paciente — NUNCA commitar
 data/cpap_sd/
 data/Smartband/

@@ -152,17 +152,21 @@ function demoInit(D) {
     document.querySelectorAll('label[for="patientSelect"]').forEach(l => l.style.display = 'none');
 
     // Set global state
-    currentPatient = D.patient;
+    currentPatientData = D.patientData;
+    currentMiData = D.miData;
 
-    // Store data for date filtering & status ring
-    _lastData = D.patientData;
-    _lastMiData = D.miData;
+    // Set globalSelectedDate to most recent date
+    if (D.patientData && D.patientData.timeseries && D.patientData.timeseries.data_sessao) {
+        const dates = D.patientData.timeseries.data_sessao;
+        if (dates.length > 0) {
+            globalSelectedDate = dates[dates.length - 1];
+        }
+    }
 
     // Populate period selectors
     if (D.periods && D.periods.length) {
         availablePeriods = D.periods;
         updateDateSelectors();
-        // override month/year to match fetched data
         if (D.month && D.year) {
             currentMonth = D.month;
             currentYear = D.year;
@@ -193,11 +197,10 @@ function demoInit(D) {
         sortTable('sleep', 'report_date', 'desc');
     }
 
-    // Update UI with KPIs, status ring, sleep quality
-    updateUI(D.patientData, D.miData);
-
-    // Render charts (computes 7-day averages, builds chart data)
-    renderCharts();
+    // Update KPIs, averages and charts using current app.js functions
+    updateKPIs(D.patientData, D.miData);
+    updateAverages(D.patientData, D.miData);
+    renderGraficosCharts(D.patientData, D.miData);
 }
 """
 

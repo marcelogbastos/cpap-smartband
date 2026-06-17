@@ -1,8 +1,17 @@
 import math
+from typing import Optional
 import pandas as pd
 
-def calculate_mask_seal_score(leak):
-    if pd.isna(leak) or leak < 0:
+def calculate_mask_seal_score(leak: Optional[float]) -> int:
+    """Calcula pontuação de vedação da máscara a partir do vazamento (Leak 95%).
+
+    Args:
+        leak: Valor do vazamento em L/min.
+
+    Returns:
+        Inteiro com a pontuação (0-20).
+    """
+    if pd.isna(leak) or leak is None or leak < 0:
         return 20
     if leak <= 16:
         return 20
@@ -10,8 +19,16 @@ def calculate_mask_seal_score(leak):
         return 0
     return int(20 - math.ceil((leak - 16) / 2))
 
-def calculate_mask_on_off_score(removals):
-    if pd.isna(removals) or removals < 1:
+def calculate_mask_on_off_score(removals: Optional[float]) -> int:
+    """Pontuação baseada no número de remoções da máscara durante a sessão.
+
+    Args:
+        removals: Número de eventos de remoção.
+
+    Returns:
+        Pontuação de 0 a 5.
+    """
+    if pd.isna(removals) or removals is None or removals < 1:
         return 5
     removals = int(removals)
     if removals <= 2:
@@ -25,8 +42,16 @@ def calculate_mask_on_off_score(removals):
     else:
         return 0
 
-def calculate_ahi_score(ahi):
-    if pd.isna(ahi) or ahi < 0:
+def calculate_ahi_score(ahi: Optional[float]) -> int:
+    """Calcula pontuação a partir do índice AHI (eventos/hora).
+
+    Args:
+        ahi: Índice de apneia-hipopneia.
+
+    Returns:
+        Pontuação de 0 a 5.
+    """
+    if pd.isna(ahi) or ahi is None or ahi < 0:
         return 5
     if ahi < 7:
         return 5
@@ -41,13 +66,29 @@ def calculate_ahi_score(ahi):
     else:
         return 0
 
-def calculate_usage_score(usage_mins):
-    if pd.isna(usage_mins) or usage_mins <= 0:
+def calculate_usage_score(usage_mins: Optional[float]) -> int:
+    """Calcula pontuação baseada nas horas de uso do CPAP.
+
+    Args:
+        usage_mins: Minutos de uso da sessão.
+
+    Returns:
+        Pontuação (0-70) proporcional ao tempo de uso.
+    """
+    if pd.isna(usage_mins) or usage_mins is None or usage_mins <= 0:
         return 0
     raw_score = (usage_mins / 60.0) * 10.0
     return min(70, int(round(raw_score)))
 
-def calculate_myair_score(row):
+def calculate_myair_score(row: pd.Series) -> int:
+    """Calcula o score myAir a partir de uma linha (Series) de dados CPAP.
+
+    Args:
+        row: `pandas.Series` contendo colunas como `usage_mins`, `Leak.95`, `MaskEvents`, `AHI`.
+
+    Returns:
+        Inteiro representando o score combinado.
+    """
     usage_score = calculate_usage_score(row.get('usage_mins', 0))
     if usage_score <= 0:
         return 0

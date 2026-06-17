@@ -1,0 +1,241 @@
+/* =====================================================
+   CPAP Dashboard — Estilos Globais
+   Movido de index.html <style> para este arquivo
+   ===================================================== */
+
+/* Base */
+body {
+    background-color: #0e1117;
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+    overflow-x: hidden;
+}
+
+/* Cards */
+.card {
+    background-color: #1e2130;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    overflow: visible;
+}
+
+/* KPI */
+.kpi-title {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.kpi-value {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 0;
+}
+
+.kpi-unit {
+    font-size: 10px;
+    opacity: 0.5;
+    margin-top: 2px;
+}
+
+/* Tabs */
+.tab-btn {
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tab-btn.active {
+    color: #60a5fa;
+    border-bottom-color: #60a5fa;
+    font-weight: 600;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    position: relative;
+    z-index: 0;
+}
+
+/* Sorting icons */
+th.sort-asc .sort-icon::after { content: ' ↑'; }
+th.sort-desc .sort-icon::after { content: ' ↓'; }
+th .sort-icon { opacity: 0.4; }
+th:hover .sort-icon { opacity: 1; }
+th.sort-asc .sort-icon,
+th.sort-desc .sort-icon { opacity: 1; }
+
+select { outline: none; }
+
+/* Info tooltips */
+.info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: help;
+    position: absolute;
+    font-style: normal;
+    line-height: 1;
+    z-index: 10;
+}
+
+.info-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    z-index: 9999;
+}
+
+.info-btn .tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #334155;
+    color: #f1f5f9;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 400;
+    white-space: normal;
+    width: 270px;
+    text-align: left;
+    line-height: 1.5;
+    z-index: inherit;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    transition: opacity 0.15s, visibility 0.15s;
+    border: 1px solid #64748b;
+}
+
+.info-btn:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Section headers */
+.section-header {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.subsection-header {
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    margin-top: 16px;
+}
+
+/* Custom selects */
+.custom-select {
+    background-color: #111827;
+    color: #d1d5db;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+}
+
+/* Period filter buttons */
+.period-btn {
+    background-color: #1f2937;
+    color: #d1d5db;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.period-btn:hover {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+.period-btn.active {
+    background-color: #60a5fa;
+    border-color: #3b82f6;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* =====================================================
+   Loading Spinner Global
+   ===================================================== */
+#global-spinner {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 17, 23, 0.7);
+    z-index: 9998;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.spinner-ring {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(96, 165, 250, 0.2);
+    border-top-color: #60a5fa;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* =====================================================
+   Error Banner Global
+   ===================================================== */
+#global-error {
+    display: none;
+    background: rgba(220, 38, 38, 0.15);
+    border: 1px solid rgba(220, 38, 38, 0.4);
+    color: #fca5a5;
+    font-size: 13px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    text-align: center;
+}
