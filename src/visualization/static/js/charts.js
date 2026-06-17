@@ -72,7 +72,8 @@ function renderCalendarHeatmap(containerId, dateValueMap, colorFn, fmtFn, unit) 
             const isDark  = bg === '#1f2937' || bg === '#ef4444' || bg === '#818cf8' || bg === '#f472b6';
             const fg      = isDark ? 'rgba(255,255,255,0.55)' : '#111827';
             const label   = val !== null ? fmtFn(val) : '';
-            const tipText = val !== null ? `${dateStr}: ${fmtFn(val)}${unit ? ' ' + unit : ''}` : `${dateStr}: sem dado`;
+            const dateBR  = formatDateBR(dateStr);
+            const tipText = val !== null ? `${dateBR}: ${fmtFn(val)}${unit ? ' ' + unit : ''}` : `${dateBR}: sem dado`;
 
             html += `<div data-tip="${tipText}" style="
                 background:${bg};border-radius:3px;aspect-ratio:1;

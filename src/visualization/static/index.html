@@ -413,11 +413,20 @@
                 </table>
             </div>
 
-            <!-- Scatter: AHI × Sleep Score -->
-            <div class="card">
-                <h2 class="text-xs font-semibold mb-3 text-gray-300">IAH × Score de Sono</h2>
-                <p class="text-xs text-gray-500 mb-3">Cada ponto é uma noite. Tendência esperada: IAH menor → score de sono maior.</p>
-                <div class="h-56 relative"><canvas id="chartCorrelacaoScatter"></canvas></div>
+            <!-- Timeline IAH + Sleep Score -->
+            <div class="card mb-4 relative">
+                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Gráfico:</b> Evolução Noturna — IAH vs Score de Sono<br><br><b>Como ler:</b> As barras representam o IAH de cada noite (eixo esquerdo). A linha roxa representa o Score de Sono da smartband (eixo direito).<br><br><b>O que procurar:</b> Quando as barras estão verdes e baixas (IAH &lt; 5), a linha roxa tende a estar mais alta — indicando que o CPAP controlou a apneia e o sono foi melhor. Barras vermelhas/amarelas com linha baixa sinalizam noites problemáticas.<br><br><b>Cores das barras (IAH):</b><br>🟢 &lt; 5 — Controlado<br>🟡 5–15 — Leve<br>🔴 &gt; 15 — Moderado/Grave<br><br><b>Linha roxa:</b> Score de Sono (0–100). Quanto mais alto, melhor a qualidade do sono registrada pela smartband.</span></i>
+                <h2 class="text-xs font-semibold mb-1 text-gray-300">Evolução Noturna — IAH vs Score de Sono</h2>
+                <p class="text-xs text-gray-500 mb-3">Barras = IAH (eixo esq.). Linha = Score de Sono (eixo dir.). Quando o IAH cai, o score tende a subir.</p>
+                <div class="h-64 relative"><canvas id="chartTimeline"></canvas></div>
+            </div>
+
+            <!-- Scatter Quadrante -->
+            <div class="card relative">
+                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Gráfico:</b> Quadrante — Controle CPAP × Qualidade do Sono<br><br><b>Como ler:</b> Cada ponto é uma noite. O eixo horizontal é o IAH; o vertical é o Score de Sono. As linhas tracejadas dividem o gráfico em 4 regiões.<br><br><b>Quadrantes:</b><br>✅ <b>Superior esquerdo</b> — IAH &lt; 5 e Score ≥ 60: noite ideal. CPAP controlado e sono de qualidade.<br>⚠️ <b>Superior direito</b> — IAH ≥ 5 e Score ≥ 60: apneia elevada mas a smartband avaliou o sono bem. Pode indicar adaptação ou diferença de sensores.<br>⚠️ <b>Inferior esquerdo</b> — IAH &lt; 5 e Score &lt; 60: CPAP controlado mas sono ruim. Outros fatores podem estar afetando (estresse, ambiente, comportamento).<br>❌ <b>Inferior direito</b> — IAH ≥ 5 e Score &lt; 60: pior cenário. Apneia elevada e sono de baixa qualidade.<br><br><b>Objetivo:</b> Concentrar o máximo de pontos no quadrante superior esquerdo (✅).</span></i>
+                <h2 class="text-xs font-semibold mb-1 text-gray-300">Quadrante — Controle CPAP × Qualidade do Sono</h2>
+                <p class="text-xs text-gray-500 mb-3">Cada ponto é uma noite. Quadrante ideal: IAH &lt; 5 e Score ≥ 60.</p>
+                <div class="h-72 relative"><canvas id="chartScatterQuadrant"></canvas></div>
             </div>
         </div>
     </div>

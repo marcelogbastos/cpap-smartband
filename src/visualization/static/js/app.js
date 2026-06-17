@@ -579,22 +579,113 @@ async function loadCorrelation(patient) {
             </tr>`;
         }
 
-        // Scatter: IAH × Sleep Score
         const pairs = data.ahi_sleep_score_pairs;
         if (pairs && pairs.ahi && pairs.ahi.length > 0) {
-            const scatterData = pairs.ahi.map((ahi, i) => ({
-                x: ahi, y: pairs.sleep_score[i], date: (pairs.dates || [])[i] || ''
-            }));
-            if (charts['chartCorrelacaoScatter']) { charts['chartCorrelacaoScatter'].destroy(); delete charts['chartCorrelacaoScatter']; }
-            const el = document.getElementById('chartCorrelacaoScatter');
-            if (el) {
-                charts['chartCorrelacaoScatter'] = new Chart(el.getContext('2d'), {
+            const dates      = pairs.dates || [];
+            const ahiVals    = pairs.ahi;
+            const scoreVals  = pairs.sleep_score;
+
+            // Sort by date
+            const sorted = dates.map((d, i) => ({ d, ahi: ahiVals[i], score: scoreVals[i] }))
+                                 .sort((a, b) => a.d.localeCompare(b.d));
+            const sortedDates  = sorted.map(r => r.d.slice(5));   // MM-DD
+            const sortedAhi    = sorted.map(r => r.ahi);
+            const sortedScore  = sorted.map(r => r.score);
+            const sortedFull   = sorted.map(r => r.d);
+
+            // ── TIMELINE: barras IAH + linha Sleep Score ──────────────────
+            ;['chartTimeline'].forEach(id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } });
+            const elTL = document.getElementById('chartTimeline');
+            if (elTL) {
+                charts['chartTimeline'] = new Chart(elTL.getContext('2d'), {
+                    data: {
+                        labels: sortedDates,
+                        datasets: [
+                            {
+                                type: 'bar',
+                                label: 'IAH',
+                                data: sortedAhi,
+                                backgroundColor: sortedAhi.map(v => v < 5 ? 'rgba(34,197,94,0.8)' : v <= 15 ? 'rgba(250,204,21,0.8)' : 'rgba(239,68,68,0.8)'),
+                                yAxisID: 'yAhi',
+                                barPercentage: 0.7,
+                                order: 2,
+                            },
+                            {
+                                type: 'line',
+                                label: 'Score Sono',
+                                data: sortedScore,
+                                borderColor: '#818cf8',
+                                backgroundColor: 'rgba(129,140,248,0.15)',
+                                fill: false,
+                                tension: 0.3,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#818cf8',
+                                borderWidth: 2,
+                                yAxisID: 'yScore',
+                                order: 1,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 12, padding: 10 } },
+                            datalabels: { display: false },
+                            tooltip: { callbacks: { title: (items) => sortedFull[items[0].dataIndex] } }
+                        },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 9 } } },
+                            yAhi: {
+                                type: 'linear', position: 'left',
+                                title: { display: true, text: 'IAH', color: '#9ca3af', font: { size: 10 } },
+                                min: 0, suggestedMax: 20,
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                border: { dash: [4, 4] },
+                            },
+                            yScore: {
+                                type: 'linear', position: 'right',
+                                title: { display: true, text: 'Score Sono', color: '#818cf8', font: { size: 10 } },
+                                min: 0, max: 100,
+                                grid: { display: false },
+                                ticks: { color: '#818cf8' },
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ── SCATTER QUADRANTE ─────────────────────────────────────────
+            ;['chartScatterQuadrant'].forEach(id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } });
+            const elSQ = document.getElementById('chartScatterQuadrant');
+            if (elSQ) {
+                const quadColor = (ahi, score) => {
+                    if (ahi < 5 && score >= 60)  return 'rgba(34,197,94,0.85)';   // ✅ ideal
+                    if (ahi < 5 && score < 60)   return 'rgba(250,204,21,0.85)';  // ⚠️ controlado mas sono ruim
+                    if (ahi >= 5 && score >= 60) return 'rgba(251,146,60,0.85)';  // ⚠️ não controlado mas sono ok
+                    return 'rgba(239,68,68,0.85)';                                 // ❌ pior caso
+                };
+
+                const scatterData = sorted.map(r => ({
+                    x: r.ahi, y: r.score, date: r.d,
+                    color: quadColor(r.ahi, r.score)
+                }));
+
+                // Contagem por quadrante para labels
+                const q = { tl: 0, tr: 0, bl: 0, br: 0 };
+                sorted.forEach(r => {
+                    if (r.ahi < 5  && r.score >= 60) q.tl++;
+                    if (r.ahi >= 5 && r.score >= 60) q.tr++;
+                    if (r.ahi < 5  && r.score < 60)  q.bl++;
+                    if (r.ahi >= 5 && r.score < 60)  q.br++;
+                });
+
+                charts['chartScatterQuadrant'] = new Chart(elSQ.getContext('2d'), {
                     type: 'scatter',
                     data: {
                         datasets: [{
                             data: scatterData,
-                            backgroundColor: scatterData.map(p => p.x < 5 ? 'rgba(39,174,96,0.75)' : 'rgba(231,76,60,0.75)'),
-                            pointRadius: 6, pointHoverRadius: 8,
+                            backgroundColor: scatterData.map(p => p.color),
+                            pointRadius: 7, pointHoverRadius: 9,
                         }]
                     },
                     options: {
@@ -602,12 +693,58 @@ async function loadCorrelation(patient) {
                         plugins: {
                             legend: { display: false },
                             datalabels: { display: false },
-                            tooltip: { callbacks: { label: (c) => `${c.raw.date} | IAH: ${c.raw.x} | Score: ${c.raw.y}` } }
+                            tooltip: {
+                                callbacks: {
+                                    label: (c) => {
+                                        const p = c.raw;
+                                        const label = p.x < 5 && p.y >= 60  ? '✅ Controlado + Bom Sono'
+                                                    : p.x < 5  && p.y < 60  ? '⚠️ Controlado + Sono Ruim'
+                                                    : p.x >= 5 && p.y >= 60 ? '⚠️ Não Controlado + Bom Sono'
+                                                    :                          '❌ Não Controlado + Sono Ruim';
+                                        return [`${p.date}`, `IAH: ${p.x}  Score: ${p.y}`, label];
+                                    }
+                                }
+                            },
+                            // Linhas de quadrante via annotation plugin não disponível — usamos afterDraw
                         },
                         scales: {
-                            x: { title: { display: true, text: 'IAH (eventos/h)', color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
-                            y: { title: { display: true, text: 'Score de Sono', color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' }, min: 0, max: 100 }
-                        }
+                            x: {
+                                title: { display: true, text: 'IAH (eventos/h)', color: '#a0aec0' },
+                                grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true, suggestedMax: 20
+                            },
+                            y: {
+                                title: { display: true, text: 'Score de Sono', color: '#a0aec0' },
+                                grid: { color: 'rgba(255,255,255,0.05)' }, min: 0, max: 100
+                            }
+                        },
+                        animation: { onComplete() {
+                            const ctx = elSQ.getContext('2d');
+                            const chart = this;
+                            const xScale = chart.scales.x;
+                            const yScale = chart.scales.y;
+                            const x5   = xScale.getPixelForValue(5);
+                            const y60  = yScale.getPixelForValue(60);
+                            const { left, right, top, bottom } = chart.chartArea;
+
+                            ctx.save();
+                            ctx.setLineDash([6, 4]);
+                            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                            ctx.lineWidth = 1;
+                            // Linha vertical IAH=5
+                            ctx.beginPath(); ctx.moveTo(x5, top); ctx.lineTo(x5, bottom); ctx.stroke();
+                            // Linha horizontal Score=60
+                            ctx.beginPath(); ctx.moveTo(left, y60); ctx.lineTo(right, y60); ctx.stroke();
+                            ctx.setLineDash([]);
+
+                            // Rótulos dos quadrantes
+                            ctx.font = '10px Segoe UI';
+                            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                            ctx.fillText(`✅ ${q.tl} noites`, left + 6,  top + 14);
+                            ctx.fillText(`⚠️ ${q.tr} noites`, x5 + 6,   top + 14);
+                            ctx.fillText(`⚠️ ${q.bl} noites`, left + 6,  y60 + 14);
+                            ctx.fillText(`❌ ${q.br} noites`, x5 + 6,    y60 + 14);
+                            ctx.restore();
+                        }}
                     }
                 });
             }
