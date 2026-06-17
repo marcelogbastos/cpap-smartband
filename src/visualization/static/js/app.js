@@ -648,3 +648,56 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 fetchPatients();
+
+// ─── GLOBAL TOOLTIP ────────────────────────────────────────────────────────────
+(function () {
+    const globalTip = document.getElementById('global-tooltip');
+    if (!globalTip) return;
+
+    const TIP_W   = 270;
+    const MARGIN  = 10;
+    const GAP     = 8;   // gap between button and tooltip
+
+    function position(rect) {
+        // First render off-screen to measure real height
+        globalTip.style.visibility = 'hidden';
+        globalTip.style.display    = 'block';
+        const tipH = globalTip.offsetHeight;
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        // Vertical: prefer above, fall back to below
+        let top;
+        if (rect.top - tipH - GAP >= MARGIN) {
+            top = rect.top - tipH - GAP;
+        } else {
+            top = rect.bottom + GAP;
+        }
+        // Clamp vertically
+        top = Math.max(MARGIN, Math.min(top, vh - tipH - MARGIN));
+
+        // Horizontal: centre on button, clamp to viewport
+        let left = rect.left + rect.width / 2 - TIP_W / 2;
+        left = Math.max(MARGIN, Math.min(left, vw - TIP_W - MARGIN));
+
+        globalTip.style.top        = top  + 'px';
+        globalTip.style.left       = left + 'px';
+        globalTip.style.visibility = '';
+    }
+
+    document.addEventListener('mouseover', (e) => {
+        const btn = e.target.closest('.info-btn');
+        if (!btn) return;
+        const src = btn.querySelector('.tooltip');
+        if (!src) return;
+        globalTip.innerHTML = src.innerHTML;
+        position(btn.getBoundingClientRect());
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const btn = e.target.closest('.info-btn');
+        if (!btn) return;
+        globalTip.style.display = 'none';
+    });
+})();
