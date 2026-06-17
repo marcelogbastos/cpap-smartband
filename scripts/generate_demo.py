@@ -205,6 +205,37 @@ function demoInit(D) {
 """
 
 
+STATIC_DIR = os.path.join(BASE_DIR, "src", "visualization", "static")
+
+def inline_assets(html):
+    """Substitui referências a /static/... por conteúdo inline (CSS e JS locais)."""
+    import re
+
+    # Inline CSS: <link rel="stylesheet" href="/static/css/...">
+    def replace_css(m):
+        path = m.group(1).lstrip("/").replace("/", os.sep)
+        full = os.path.join(BASE_DIR, "src", "visualization", path)
+        if not os.path.exists(full):
+            return m.group(0)
+        content = open(full, encoding="utf-8").read()
+        return f"<style>{content}</style>"
+
+    html = re.sub(r'<link[^>]+href="(/static/[^"]+\.css)"[^>]*>', replace_css, html)
+
+    # Inline JS: <script src="/static/js/...">
+    def replace_js(m):
+        path = m.group(1).lstrip("/").replace("/", os.sep)
+        full = os.path.join(BASE_DIR, "src", "visualization", path)
+        if not os.path.exists(full):
+            return m.group(0)
+        content = open(full, encoding="utf-8").read()
+        return f"<script>{content}</script>"
+
+    html = re.sub(r'<script\s+src="(/static/[^"]+\.js)"[^>]*></script>', replace_js, html)
+
+    return html
+
+
 def generate():
     parser = argparse.ArgumentParser(description="Gera HTML estático criptografado do dashboard")
     parser.add_argument("--password", "-p", required=True, help="Senha para desbloquear")
@@ -216,8 +247,11 @@ def generate():
     with open(INDEX_PATH, "r", encoding="utf-8") as f:
         html = f.read()
 
-    # Inject lock CSS
-    html = html.replace("</style>", LOCK_CSS + "\n</style>")
+    # Inline /static/css/*.css e /static/js/*.js antes de qualquer modificação
+    html = inline_assets(html)
+
+    # Inject lock CSS no primeiro <style> inline
+    html = html.replace("</style>", LOCK_CSS + "\n</style>", 1)
 
     # Inject lock HTML after <body>
     html = html.replace("<body>", "<body>\n" + LOCK_HTML)
