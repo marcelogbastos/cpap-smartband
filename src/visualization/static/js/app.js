@@ -44,26 +44,6 @@ document.getElementById('periodSelect').addEventListener('change', (e) => {
     }
 });
 
-// Period buttons (7 days / 30 days)
-document.getElementById('btn-7days').addEventListener('click', () => {
-    globalSelectedPeriod = 7;
-    document.getElementById('btn-7days').classList.add('active');
-    document.getElementById('btn-30days').classList.remove('active');
-    if (currentPatientData && currentMiData) {
-        updateAverages(currentPatientData, currentMiData);
-        renderGraficosCharts(currentPatientData, currentMiData);
-    }
-});
-
-document.getElementById('btn-30days').addEventListener('click', () => {
-    globalSelectedPeriod = 30;
-    document.getElementById('btn-30days').classList.add('active');
-    document.getElementById('btn-7days').classList.remove('active');
-    if (currentPatientData && currentMiData) {
-        updateAverages(currentPatientData, currentMiData);
-        renderGraficosCharts(currentPatientData, currentMiData);
-    }
-});
 
 // Tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
