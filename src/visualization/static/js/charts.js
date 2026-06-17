@@ -70,10 +70,10 @@ function renderCalendarHeatmap(containerId, dateValueMap, colorFn, fmtFn, unit) 
             const val     = days[dateStr] !== undefined ? days[dateStr] : null;
             const bg      = val !== null ? colorFn(val) : '#1f2937';
             const isDark  = bg === '#1f2937' || bg === '#ef4444' || bg === '#818cf8' || bg === '#f472b6';
-            const fg      = isDark ? 'rgba(255,255,255,0.55)' : '#111827';
-            const label   = val !== null ? fmtFn(val) : '';
+            const fg      = val !== null ? (isDark ? 'rgba(255,255,255,0.55)' : '#111827') : 'rgba(255,255,255,0.2)';
+            const label   = val !== null ? fmtFn(val) : '—';
             const dateBR  = formatDateBR(dateStr);
-            const tipText = val !== null ? `${dateBR}: ${fmtFn(val)}${unit ? ' ' + unit : ''}` : `${dateBR}: sem dado`;
+            const tipText = val !== null ? `${dateBR}: ${fmtFn(val)}${unit ? ' ' + unit : ''}` : `${dateBR}: Sem Informação`;
 
             html += `<div data-tip="${tipText}" style="
                 background:${bg};border-radius:3px;aspect-ratio:1;
@@ -148,11 +148,11 @@ function renderGraficosCharts(data, miData) {
 
     renderCalendarHeatmap('heatmap-cpap-score', cpapScoreMap,
         v => v >= 70 ? '#22c55e' : v >= 50 ? '#facc15' : '#ef4444',
-        v => Math.round(v), '');
+        v => Math.round(v), 'pts');
 
     renderCalendarHeatmap('heatmap-sleep-score', sleepScoreMap,
         v => v >= 80 ? '#22c55e' : v >= 60 ? '#facc15' : '#ef4444',
-        v => Math.round(v), '');
+        v => Math.round(v), 'pts');
 
     renderCalendarHeatmap('heatmap-pressure', pressureMap,
         v => v <= 12 ? '#38bdf8' : v <= 16 ? '#818cf8' : '#f472b6',
@@ -180,10 +180,10 @@ function renderGraficosCharts(data, miData) {
             });
         }
 
-        const deep  = miVal('deep_min');
-        const rem   = miVal('rem_min');
-        const light = miVal('light_min');
-        const awake = miVal('awake_min');
+        const deep  = miVal('deep_min').map(v => +(v / 60).toFixed(2));
+        const rem   = miVal('rem_min').map(v => +(v / 60).toFixed(2));
+        const light = miVal('light_min').map(v => +(v / 60).toFixed(2));
+        const awake = miVal('awake_min').map(v => +(v / 60).toFixed(2));
         const avgHr = miVal('avg_hr');
         const minHr = miVal('min_hr');
         const maxHr = miVal('max_hr');
@@ -197,7 +197,7 @@ function renderGraficosCharts(data, miData) {
             ...baseOpts,
             scales: {
                 x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [4,4] }, ticks: { callback: v => v + 'min' } }
+                y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [4,4] }, ticks: { callback: v => v.toFixed(1) + 'h' } }
             }
         };
 

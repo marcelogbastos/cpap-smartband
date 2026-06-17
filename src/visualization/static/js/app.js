@@ -65,8 +65,9 @@ function sortTable(table, col, dir) {
         if (valA > valB) return dir === 'asc' ? 1 : -1;
         return 0;
     });
-    if (table === 'sleep') renderSleepTable(data);
-    else renderCpapTable(data);
+    const sortByDate = col === 'report_date' || col === 'data_sessao';
+    if (table === 'sleep') renderSleepTable(data, sortByDate);
+    else renderCpapTable(data, sortByDate);
 }
 
 function updateSortIcons(table) {
@@ -209,20 +210,61 @@ async function loadMonthlyCpap(patient) {
     } catch (e) { console.error("Error loading monthly CPAP", e); }
 }
 
-function renderCpapTable(rows) {
+function _allDaysInMonth(year, month) {
+    if (!year || !month) return [];
+    const days = [];
+    const total = new Date(year, month, 0).getDate();
+    for (let d = 1; d <= total; d++) {
+        days.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    }
+    return days;
+}
+
+const _DASH = '<span class="text-gray-600">-</span>';
+
+function renderCpapTable(rows, sortByDate = false) {
     const tbody = document.getElementById('cpapTableBody');
-    if (!rows || rows.length === 0) {
+    const allDays = _allDaysInMonth(currentYear, currentMonth);
+
+    if ((!rows || rows.length === 0) && allDays.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="px-2 py-2 text-center text-gray-500">Sem dados de CPAP para este período</td></tr>';
         return;
     }
-    tbody.innerHTML = rows.map(row => {
+
+    const byDate = {};
+    (rows || []).forEach(r => { byDate[r.data_sessao] = r; });
+
+    // Dias com dado ordenados conforme solicitado + dias sem dado ao final (ou intercalados se ordenação por data)
+    let renderDays;
+    if (sortByDate) {
+        renderDays = allDays;
+        if (sortState.cpap.dir === 'desc') renderDays = [...allDays].reverse();
+    } else {
+        const withData = (rows || []).map(r => r.data_sessao);
+        const withoutData = allDays.filter(d => !byDate[d]);
+        renderDays = [...withData, ...withoutData];
+    }
+
+    tbody.innerHTML = renderDays.map(date => {
+        const row = byDate[date];
+        const dateDisplay = formatDateBR(date);
+        if (!row) {
+            return `<tr class="border-b border-gray-800 text-xs">
+                <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap">${dateDisplay}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+            </tr>`;
+        }
         const score = row.score || 0;
         const scoreColor = score >= 70 ? 'text-green-500' : score >= 50 ? 'text-yellow-500' : 'text-red-500';
         const usageColor = (row.usage_mins || 0) >= 240 ? 'text-green-400' : 'text-red-400';
         const ahiColor = (row.ahi || 0) < 5 ? 'text-green-400' : (row.ahi || 0) < 15 ? 'text-yellow-400' : 'text-red-400';
         const leakColor = (row.leak_95 || 0) <= 24 ? 'text-green-400' : 'text-red-400';
         return `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e] transition-colors">
-            <td class="px-2 py-2 text-gray-400 whitespace-nowrap">${row.data_sessao}</td>
+            <td class="px-2 py-2 text-gray-400 whitespace-nowrap">${dateDisplay}</td>
             <td class="px-2 py-2 ${usageColor} whitespace-nowrap">${formatHoursMinutes(row.usage_mins)}</td>
             <td class="px-2 py-2 ${ahiColor} whitespace-nowrap">${(row.ahi||0).toFixed(1)}</td>
             <td class="px-2 py-2 whitespace-nowrap">${(row.p95_pressure || 0).toFixed(1)}</td>
@@ -232,18 +274,47 @@ function renderCpapTable(rows) {
     }).join('');
 }
 
-function renderSleepTable(rows) {
+function renderSleepTable(rows, sortByDate = false) {
     const tbody = document.getElementById('sleepTableBody');
-    if (!rows || rows.length === 0) {
+    const allDays = _allDaysInMonth(currentYear, currentMonth);
+
+    if ((!rows || rows.length === 0) && allDays.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="px-2 py-2 text-center text-gray-500">Sem dados de sono para este período</td></tr>';
         return;
     }
-    tbody.innerHTML = rows.map(row => {
+
+    const byDate = {};
+    (rows || []).forEach(r => { byDate[r.report_date] = r; });
+
+    let renderDays;
+    if (sortByDate) {
+        renderDays = allDays;
+        if (sortState.sleep.dir === 'desc') renderDays = [...allDays].reverse();
+    } else {
+        const withData = (rows || []).map(r => r.report_date);
+        const withoutData = allDays.filter(d => !byDate[d]);
+        renderDays = [...withData, ...withoutData];
+    }
+
+    tbody.innerHTML = renderDays.map(date => {
+        const row = byDate[date];
+        const dateDisplay = formatDateBR(date);
+        if (!row) {
+            return `<tr class="border-b border-gray-800 text-xs">
+                <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap">${dateDisplay}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+                <td class="px-2 py-1.5 text-center">${_DASH}</td>
+            </tr>`;
+        }
         const total = row.total_duration_min || 0;
         const rem = row.rem_min || 0;
         const remPct = row.rem_pct ? row.rem_pct.toFixed(1) : '0.0';
         return `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e] transition-colors">
-            <td class="px-2 py-2 text-gray-400 whitespace-nowrap">${row.report_date}</td>
+            <td class="px-2 py-2 text-gray-400 whitespace-nowrap">${dateDisplay}</td>
             <td class="px-2 py-2 whitespace-nowrap">${formatHoursMinutes(total)}</td>
             <td class="px-2 py-2 text-yellow-500 whitespace-nowrap">${formatHoursDecimal(rem)}</td>
             <td class="px-2 py-2 text-blue-500 whitespace-nowrap">${formatHoursDecimal(row.deep_min || 0)}</td>
