@@ -31,6 +31,9 @@ class SleepRow(BaseModel):
     light_min: float
     awake_min: float
     sleep_score: float
+    avg_hr: float = 0
+    min_hr: float = 0
+    max_hr: float = 0
 
 
 class MonthlySleepTable(BaseModel):
@@ -68,3 +71,18 @@ class CorrelationResponse(BaseModel):
     metrics: List[CorrelationMetric]
     nights_with_both: int
     ahi_sleep_score_pairs: Dict[str, List[Any]]
+
+
+class AhiHeatmapDay(BaseModel):
+    date: str
+    ahi: float
+
+
+class AhiHeatmapMonth(BaseModel):
+    year: int
+    month: int
+    days: List[AhiHeatmapDay]
+
+
+class AhiHeatmapResponse(BaseModel):
+    months: List[AhiHeatmapMonth]

@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from ..schemas.models import PatientDataResponse, SmartbandDataResponse, MonthlySleepTable, MonthlyCpapTable, CorrelationResponse
+from ..schemas.models import PatientDataResponse, SmartbandDataResponse, MonthlySleepTable, MonthlyCpapTable, CorrelationResponse, AhiHeatmapResponse
 from ..services.data_loader import load_cpap_data, load_smartband_table, PROCESSED_BASE_DIR
 from ..services.cpap_scoring import calculate_myair_score
 
@@ -170,7 +170,12 @@ def get_monthly_sleep_table(patient: str, year: int = Query(None), month: int = 
             df_p = df_p.sort_values('report_date')
             df_p['report_date'] = df_p['report_date'].dt.strftime('%Y-%m-%d')
         
-        df_p = df_p[['report_date', 'total_duration_min', 'rem_min', 'deep_min', 'light_min', 'awake_min', 'sleep_score']]
+        hr_cols = [c for c in ['avg_hr', 'min_hr', 'max_hr'] if c in df_p.columns]
+        select_cols = ['report_date', 'total_duration_min', 'rem_min', 'deep_min', 'light_min', 'awake_min', 'sleep_score'] + hr_cols
+        df_p = df_p[select_cols]
+        for c in ['avg_hr', 'min_hr', 'max_hr']:
+            if c not in df_p.columns:
+                df_p[c] = 0
         for col in df_p.columns:
             if col != 'report_date':
                 df_p[col] = pd.to_numeric(df_p[col], errors='coerce').fillna(0)
@@ -331,6 +336,45 @@ def get_correlation(patient: str):
     except Exception as e:
         logger.error(f"Error loading correlation data for {patient}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load correlation data")
+
+
+@router.get("/cpap/{patient}/ahi-heatmap", response_model=AhiHeatmapResponse)
+def get_ahi_heatmap(patient: str, year: int = Query(None)):
+    """Retorna IAH diário agrupado por mês para o heatmap anual."""
+    try:
+        df_all = load_cpap_data(patient)
+        if df_all.empty:
+            return {"months": []}
+
+        df = df_all[df_all['patient'] == patient].copy()
+        df = df[df['PatientHours'] > 0].copy()
+        df['sessao_dt'] = pd.to_datetime(df['data_sessao'], errors='coerce')
+        df = df.dropna(subset=['sessao_dt'])
+
+        if year:
+            df = df[df['sessao_dt'].dt.year == year]
+
+        if df.empty:
+            return {"months": []}
+
+        df['data_sessao'] = df['data_sessao'].astype(str)
+        daily = df.groupby('data_sessao').agg(ahi=('AHI', 'mean')).reset_index()
+        daily['ahi'] = daily['ahi'].clip(lower=0).round(1)
+        daily['sessao_dt'] = pd.to_datetime(daily['data_sessao'])
+        daily['year']  = daily['sessao_dt'].dt.year
+        daily['month'] = daily['sessao_dt'].dt.month
+
+        months = []
+        for (yr, mo), grp in daily.groupby(['year', 'month']):
+            days = [{"date": row['data_sessao'], "ahi": float(row['ahi'])}
+                    for _, row in grp.iterrows()]
+            months.append({"year": int(yr), "month": int(mo), "days": days})
+
+        months.sort(key=lambda m: (m['year'], m['month']))
+        return {"months": months}
+    except Exception as e:
+        logger.error(f"Error loading AHI heatmap for {patient}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load AHI heatmap")
 
 
 @router.get("/available-periods")
