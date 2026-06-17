@@ -1,3 +1,6 @@
+const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const DAY_NAMES   = ['D','S','T','Q','Q','S','S'];
+
 Chart.register(ChartDataLabels);
 Chart.defaults.color = '#a0aec0';
 Chart.defaults.font.family = "'Segoe UI', sans-serif";
@@ -26,111 +29,147 @@ function formatDateBR(dateStr) {
     return dateStr;
 }
 
+// ─── GENERIC CALENDAR HEATMAP ──────────────────────────────────────────────────
+
+function renderCalendarHeatmap(containerId, dateValueMap, colorFn, fmtFn, unit) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+
+    if (!dateValueMap || Object.keys(dateValueMap).length === 0) {
+        el.innerHTML = '<p style="font-size:11px;color:#6b7280;padding:8px 0;">Sem dados.</p>';
+        return;
+    }
+
+    // Group dates by year+month
+    const months = {};
+    Object.keys(dateValueMap).sort().forEach(dateStr => {
+        const [yr, mo] = dateStr.split('-');
+        const key = `${yr}-${mo}`;
+        if (!months[key]) months[key] = { year: parseInt(yr), month: parseInt(mo), days: {} };
+        months[key].days[dateStr] = dateValueMap[dateStr];
+    });
+
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:16px 20px;">';
+
+    Object.values(months).forEach(({ year, month, days }) => {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const firstDow    = new Date(year, month - 1, 1).getDay();
+
+        html += `<div style="min-width:176px">`;
+        html += `<div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:5px;">${MONTH_NAMES[month-1]} ${year}</div>`;
+        html += `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">`;
+
+        DAY_NAMES.forEach(d => {
+            html += `<div style="font-size:9px;color:#4b5563;text-align:center;padding-bottom:2px;">${d}</div>`;
+        });
+
+        for (let i = 0; i < firstDow; i++) html += `<div></div>`;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const val     = days[dateStr] !== undefined ? days[dateStr] : null;
+            const bg      = val !== null ? colorFn(val) : '#1f2937';
+            const isDark  = bg === '#1f2937' || bg === '#ef4444' || bg === '#818cf8' || bg === '#f472b6';
+            const fg      = isDark ? 'rgba(255,255,255,0.55)' : '#111827';
+            const label   = val !== null ? fmtFn(val) : '';
+            const tipText = val !== null ? `${dateStr}: ${fmtFn(val)}${unit ? ' ' + unit : ''}` : `${dateStr}: sem dado`;
+
+            html += `<div data-tip="${tipText}" style="
+                background:${bg};border-radius:3px;aspect-ratio:1;
+                display:flex;align-items:center;justify-content:center;
+                font-size:8px;font-weight:700;color:${fg};
+                min-height:22px;cursor:default;
+            ">${label}</div>`;
+        }
+
+        html += '</div></div>';
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+
+    // Wire up global tooltip for data-tip cells
+    el.querySelectorAll('[data-tip]').forEach(cell => {
+        cell.addEventListener('mouseenter', (e) => {
+            const tip = document.getElementById('global-tooltip');
+            if (!tip) return;
+            tip.textContent = e.currentTarget.dataset.tip;
+            tip.style.display = 'block';
+            const r = e.currentTarget.getBoundingClientRect();
+            const tw = 200, th = 30, m = 6;
+            let top = r.top - th - m;
+            if (top < m) top = r.bottom + m;
+            let left = r.left + r.width / 2 - tw / 2;
+            left = Math.max(m, Math.min(left, window.innerWidth - tw - m));
+            tip.style.top = top + 'px';
+            tip.style.left = left + 'px';
+        });
+        cell.addEventListener('mouseleave', () => {
+            const tip = document.getElementById('global-tooltip');
+            if (tip) tip.style.display = 'none';
+        });
+    });
+}
+
 function renderGraficosCharts(data, miData) {
     const ts = data.timeseries;
     const fullDates = ts.data_sessao || [];
 
-    // Use the month/year selected in the dropdowns
-    let refMonth = currentMonth;
-    let refYear = currentYear;
+    if (fullDates.length === 0) return;
 
-    // Filter all dates that belong to the selected month/year
+    // Build date→value maps filtered by selected month/year
+    const refMonth = currentMonth;
+    const refYear  = currentYear;
+
+    function inSelectedMonth(dateStr) {
+        if (!refMonth || !refYear) return true;
+        const [yr, mo] = dateStr.split('-');
+        return parseInt(yr) === refYear && parseInt(mo) === refMonth;
+    }
+
+    const cpapScoreMap = {};
+    const pressureMap  = {};
+    fullDates.forEach((d, i) => {
+        if (!inSelectedMonth(d)) return;
+        if (ts.score?.[i] != null)           cpapScoreMap[d] = ts.score[i];
+        if (ts['BlowPress.95']?.[i] != null) pressureMap[d]  = ts['BlowPress.95'][i];
+    });
+
+    // Sleep score from miData filtered by selected month
+    const sleepScoreMap = {};
+    if (miData.sleep?.report_date) {
+        miData.sleep.report_date.forEach((d, i) => {
+            if (!inSelectedMonth(d)) return;
+            const v = miData.sleep.sleep_score?.[i];
+            if (v != null && v > 0) sleepScoreMap[d] = v;
+        });
+    }
+
+    renderCalendarHeatmap('heatmap-cpap-score', cpapScoreMap,
+        v => v >= 70 ? '#22c55e' : v >= 50 ? '#facc15' : '#ef4444',
+        v => Math.round(v), '');
+
+    renderCalendarHeatmap('heatmap-sleep-score', sleepScoreMap,
+        v => v >= 80 ? '#22c55e' : v >= 60 ? '#facc15' : '#ef4444',
+        v => Math.round(v), '');
+
+    renderCalendarHeatmap('heatmap-pressure', pressureMap,
+        v => v <= 12 ? '#38bdf8' : v <= 16 ? '#818cf8' : '#f472b6',
+        v => v.toFixed(1), 'cmH₂O');
+
+    // Filtered range for stacked sleep + HR charts (keep month selection)
     let monthDates = fullDates;
     if (refMonth && refYear) {
-        monthDates = fullDates.filter(d => {
-            const parts = d.split('-');
-            return parseInt(parts[0]) === refYear && parseInt(parts[1]) === refMonth;
-        });
+        monthDates = fullDates.filter(d => inSelectedMonth(d));
     }
-
-    // If no dates for that month, fall back to last 30 days
-    if (monthDates.length === 0) {
-        monthDates = fullDates.slice(-30);
-    }
-
-    if (monthDates.length === 0) {
-        // Clear charts if no data
-        ['chartScore', 'chartSleepScore', 'chartAhi', 'chartPressure'].forEach(id => {
-            if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-        });
-        return;
-    }
-
-    const startIdx = fullDates.indexOf(monthDates[0]);
-    const endIdx = fullDates.indexOf(monthDates[monthDates.length - 1]) + 1;
-
-    const dates = monthDates.map(formatDateBR);
-    const scores = (ts.score || []).slice(startIdx, endIdx);
-    const ahis = (ts.AHI || []).slice(startIdx, endIdx);
-    const leaks = (ts['Leak.95'] || []).slice(startIdx, endIdx);
-    const pressures = (ts['BlowPress.95'] || []).slice(startIdx, endIdx);
-
-    function scoreColor(v) { return v >= 70 ? '#27ae60' : v >= 50 ? '#f39c12' : '#e74c3c'; }
-    function sleepScoreColor(v) { return v >= 70 ? '#27ae60' : v >= 50 ? '#f39c12' : '#e74c3c'; }
-    function ahiColor(v) { return v < 5 ? '#27ae60' : v < 15 ? '#f39c12' : '#e74c3c'; }
-    function presColor(v) { return '#27ae60'; } // Image shows all green for pressure
-    // leakColor is defined but unused in original, keeping scoreColor mappings
-
-    const commonOptions = {
-        responsive: true, maintainAspectRatio: false, 
-        plugins: { legend: { display: false } },
-        scales: { 
-            y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [4, 4] }, beginAtZero: true }, 
-            x: { grid: { display: false } } 
-        },
-        layout: { padding: { top: 20 } }
-    };
-
-    // Score CPAP
-    createChart('chartScore', 'bar', {
-        labels: dates,
-        datasets: [{ data: scores, backgroundColor: scores.map(scoreColor), borderRadius: 2, barPercentage: 0.8 }]
-    }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 100 } }});
-
-    // Sleep Score
-    let sleepScores = [];
-    let sleepLabels = [];
-    if (miData.sleep && miData.sleep.sleep_score) {
-        const miDates = miData.sleep.report_date || [];
-        const chartDates = fullDates.slice(startIdx, endIdx);
-        sleepScores = chartDates.map(d => {
-            const idx = miDates.indexOf(d);
-            return idx >= 0 ? miData.sleep.sleep_score[idx] : null;
-        }).filter(v => v !== null);
-        sleepLabels = chartDates.filter((_, i) => {
-            const idx = miDates.indexOf(chartDates[i]);
-            return idx >= 0 && miData.sleep.sleep_score[idx] != null;
-        }).map(formatDateBR);
-    }
-    if (sleepLabels.length > 0) {
-        createChart('chartSleepScore', 'bar', {
-            labels: sleepLabels,
-            datasets: [{ data: sleepScores, backgroundColor: sleepScores.map(sleepScoreColor), borderRadius: 2, barPercentage: 0.8 }]
-        }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 100 } }});
-    } else {
-        if (charts['chartSleepScore']) { charts['chartSleepScore'].destroy(); delete charts['chartSleepScore']; }
-    }
-
-    // IAH
-    createChart('chartAhi', 'bar', {
-        labels: dates,
-        datasets: [{ data: ahis, backgroundColor: ahis.map(ahiColor), borderRadius: 2, barPercentage: 0.8 }]
-    }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: 20 } }});
-
-    // Pressão
-    const presMax = pressures.length > 0 ? Math.ceil(Math.max(...pressures)) + 2 : 20;
-    createChart('chartPressure', 'bar', {
-        labels: dates,
-        datasets: [{ data: pressures, backgroundColor: pressures.map(presColor), borderRadius: 2, barPercentage: 0.8 }]
-    }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: presMax, min: 0 } } });
+    if (monthDates.length === 0) monthDates = fullDates.slice(-30);
 
     // Composição do sono (barras empilhadas) + Frequência Cardíaca
     if (miData.sleep && miData.sleep.report_date) {
         const miDates   = miData.sleep.report_date || [];
-        const chartDates = fullDates.slice(startIdx, endIdx);
 
-        // Filtra apenas datas com dado na smartband
-        const sharedDates = chartDates.filter(d => miDates.includes(d));
+        // Filtra apenas datas do mês selecionado com dado na smartband
+        const sharedDates = monthDates.filter(d => miDates.includes(d));
         const sharedLabels = sharedDates.map(formatDateBR);
 
         function miVal(field) {
@@ -148,11 +187,13 @@ function renderGraficosCharts(data, miData) {
         const minHr = miVal('min_hr');
         const maxHr = miVal('max_hr');
 
-        const noDataLabels = { plugins: { ...commonOptions.plugins, datalabels: { display: false } } };
-        const stackedBase = {
-            ...commonOptions,
-            ...noDataLabels,
+        const baseOpts = {
+            responsive: true, maintainAspectRatio: false,
             layout: { padding: { top: 8 } },
+            plugins: { legend: { display: false }, datalabels: { display: false } },
+        };
+        const stackedBase = {
+            ...baseOpts,
             scales: {
                 x: { stacked: true, grid: { display: false } },
                 y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [4,4] }, ticks: { callback: v => v + 'min' } }
@@ -171,7 +212,6 @@ function renderGraficosCharts(data, miData) {
             }, {
                 ...stackedBase,
                 plugins: {
-                    ...stackedBase.plugins,
                     legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 12, padding: 10 } },
                     datalabels: { display: false }
                 }
@@ -216,9 +256,7 @@ function renderGraficosCharts(data, miData) {
                     },
                 ]
             }, {
-                ...commonOptions,
-                ...noDataLabels,
-                layout: { padding: { top: 8 } },
+                ...baseOpts,
                 scales: {
                     x: { grid: { display: false } },
                     y: {
@@ -229,7 +267,6 @@ function renderGraficosCharts(data, miData) {
                     }
                 },
                 plugins: {
-                    ...commonOptions.plugins,
                     legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 12, padding: 10 } },
                     datalabels: { display: false }
                 }

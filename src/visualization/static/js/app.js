@@ -630,98 +630,35 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 fetchPatients();
 
-// ─── AHI HEATMAP ───────────────────────────────────────────────────────────────
-
-const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const DAY_NAMES   = ['D','S','T','Q','Q','S','S'];
-
-function ahiColor(ahi) {
-    if (ahi === null) return '#1f2937'; // sem dado
-    if (ahi < 5)      return '#22c55e'; // verde
-    if (ahi <= 15)    return '#facc15'; // amarelo
-    return '#ef4444';                   // vermelho
-}
-
-function ahiTextColor(ahi) {
-    if (ahi === null) return 'transparent';
-    if (ahi <= 15)    return '#111827';
-    return '#ffffff';
-}
-
-function renderAhiHeatmap(months) {
+async function loadAhiHeatmap(patient) {
+    const loading   = document.getElementById('ahi-heatmap-loading');
     const container = document.getElementById('ahi-heatmap');
     if (!container) return;
-
-    if (!months || months.length === 0) {
-        container.innerHTML = '<p class="text-xs text-gray-500 py-4 text-center">Sem dados para exibir.</p>';
-        return;
-    }
-
-    // Build lookup: "YYYY-MM-DD" -> ahi
-    const byDate = {};
-    months.forEach(m => m.days.forEach(d => { byDate[d.date] = d.ahi; }));
-
-    let html = '<div style="display:flex;flex-wrap:wrap;gap:16px;">';
-
-    months.forEach(({ year, month }) => {
-        const daysInMonth = new Date(year, month, 0).getDate();
-        const firstDow    = new Date(year, month - 1, 1).getDay(); // 0=Dom
-
-        html += `<div style="min-width:180px">`;
-        html += `<div style="font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:6px;">${MONTH_NAMES[month-1]} ${year}</div>`;
-        html += `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">`;
-
-        // Cabeçalho dias da semana
-        DAY_NAMES.forEach(d => {
-            html += `<div style="font-size:9px;color:#6b7280;text-align:center;padding-bottom:2px;">${d}</div>`;
-        });
-
-        // Células vazias antes do dia 1
-        for (let i = 0; i < firstDow; i++) {
-            html += `<div></div>`;
-        }
-
-        // Dias do mês
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-            const ahi     = byDate[dateStr] !== undefined ? byDate[dateStr] : null;
-            const bg      = ahiColor(ahi);
-            const fg      = ahiTextColor(ahi);
-            const label   = ahi !== null ? ahi.toFixed(1) : '';
-            const title   = ahi !== null ? `${dateStr}: IAH ${ahi.toFixed(1)}` : `${dateStr}: sem dado`;
-
-            html += `<div title="${title}" style="
-                background:${bg};border-radius:3px;aspect-ratio:1;
-                display:flex;align-items:center;justify-content:center;
-                font-size:8px;font-weight:700;color:${fg};cursor:default;
-                min-height:22px;
-            ">${label}</div>`;
-        }
-
-        html += '</div></div>';
-    });
-
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-async function loadAhiHeatmap(patient) {
-    const loading = document.getElementById('ahi-heatmap-loading');
-    const container = document.getElementById('ahi-heatmap');
     if (loading) loading.style.display = 'block';
-    if (container) container.innerHTML = '';
+    container.innerHTML = '';
 
     try {
         const res = await fetch(`/api/cpap/${patient}/ahi-heatmap`);
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
-        renderAhiHeatmap(data.months);
+
+        if (!data.months || data.months.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 py-4 text-center">Sem dados para exibir.</p>';
+            return;
+        }
+
+        const byDate = {};
+        data.months.forEach(m => m.days.forEach(d => { byDate[d.date] = d.ahi; }));
+        renderCalendarHeatmap('ahi-heatmap', byDate,
+            v => v < 5 ? '#22c55e' : v <= 15 ? '#facc15' : '#ef4444',
+            v => v.toFixed(1), 'ev/h');
     } catch (e) {
-        if (container) container.innerHTML = '<p class="text-xs text-red-400 py-2">Erro ao carregar heatmap.</p>';
+        container.innerHTML = '<p class="text-xs text-red-400 py-2">Erro ao carregar heatmap.</p>';
     } finally {
         if (loading) loading.style.display = 'none';
     }
 }
+
 
 // ─── GLOBAL TOOLTIP ────────────────────────────────────────────────────────────
 (function () {
