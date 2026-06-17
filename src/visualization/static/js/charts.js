@@ -122,5 +122,5 @@ function renderGraficosCharts(data, miData) {
     createChart('chartPressure', 'bar', {
         labels: dates,
         datasets: [{ data: pressures, backgroundColor: pressures.map(presColor), borderRadius: 2, barPercentage: 0.8 }]
-    }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: presMax, min: Math.max(0, Math.floor(Math.min(...pressures)) - 1) } }});
+    }, { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, max: presMax, min: 0 } } });
 }
