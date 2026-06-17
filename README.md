@@ -198,4 +198,14 @@ MIT License — veja [LICENSE](LICENSE) para detalhes.
 
 ## 👤 Autor
 
+## ⚙️ Como executar (rápido)
+
+Encontrará instruções detalhadas de execução com e sem Docker em: `docs/documentacao_tecnica.md` (seção "12. Como Executar (Docker / Sem Docker)").
+
+Em resumo:
+
+- Docker: `docker-compose up --build` (recomendado)
+- Local: criar venv, `pip install -r requirements.txt`, rodar `python src/ingestion/processor.py` e `uvicorn src.visualization.app:app --reload`
+
+
 Desenvolvido para uso pessoal e clínico no monitoramento de terapia CPAP integrado com wearables.

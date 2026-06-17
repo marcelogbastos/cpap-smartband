@@ -398,6 +398,95 @@ Os sinais do STR.edf oscilam ao longo da sessão (ex.: AHI varia sinusoidalmente
 ### `GET /api/smartband/{patient}/monthly-sleep`
 **Query params:** `year`, `month` (opcionais)
 
+---
+
+## 12. Como Executar (Docker / Sem Docker)
+
+Estas instruções mostram como executar o projeto localmente tanto usando Docker (recomendado para isolamento) quanto sem Docker (ambiente Python local).
+
+12.1. Usando Docker (recomendado)
+
+- Pré-requisitos: `docker` e `docker-compose` instalados.
+- O repositório já inclui `Dockerfile` e `docker-compose.yml` para rodar o servidor e um volume para `data/`.
+
+Construir a imagem (opcional - o `docker-compose` faz build automaticamente):
+
+```bash
+docker build -t cpap_smartband:latest .
+```
+
+Executar com `docker run` (exemplo simples):
+
+```bash
+docker run --rm -it -p 8000:8000 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  --env-file .env \
+  cpap_smartband:latest
+```
+
+Ou usar `docker-compose` (recomendado):
+
+```bash
+docker-compose up --build
+```
+
+Pontos importantes:
+- Monte `data/` como volume para o container acessar os dados brutos e processados.
+- Monte `logs/` se quiser persistir logs gerados dentro do container.
+- Forneça um arquivo `.env` (copie `.env.example`) com as variáveis necessárias.
+
+12.2. Sem Docker (Python local)
+
+- Pré-requisitos: Python 3.12+, `pip` e (opcional) `virtualenv`.
+
+Passos (Windows PowerShell):
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+# Opcional: copie exemplo de variáveis
+copy .env.example .env
+# Processar dados (CPAP + Smartband)
+python src/ingestion/processor.py
+python src/ingestion/smartband_processor.py --patient marcelo
+# Iniciar servidor
+uvicorn src.visualization.app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Linux / macOS (bash):
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python src/ingestion/processor.py
+python src/ingestion/smartband_processor.py --patient marcelo
+uvicorn src.visualization.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Dicas:
+- Para reprocessar tudo use `--reset` no `processor.py` ou rode `.\update_data.ps1 -Reset`.
+- Logs são gravados em `logs/processor.log` e `logs/smartband_processor.log` por padrão.
+- Se houver problemas com dependências de `mne` ou `pyedflib`, tente instalar pacotes de sistema necessários (ex.: `libatlas`, `fftw`) ou usar a imagem Docker que já inclui essas dependências.
+
+12.3. Testes rápidos
+
+Executar teste rápido unitário (criação simples) para `calculate_myair_score` (exemplo):
+
+```bash
+python - <<'PY'
+from src.visualization.services.cpap_scoring import calculate_myair_score
+import pandas as pd
+row = pd.Series({'usage_mins': 300, 'Leak.95': 10, 'MaskEvents': 0, 'AHI': 4})
+print(calculate_myair_score(row))
+PY
+```
+
+---
+
 **Resposta:**
 ```json
 {
