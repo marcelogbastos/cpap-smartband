@@ -50,7 +50,7 @@ Write-Title "Processando dados CPAP (cartao SD)"
 $cpapArgs = @()
 if ($Reset) { $cpapArgs += "--reset" }
 
-python src/ingestion/processor.py @cpapArgs
+& ".\venv\Scripts\python.exe" -m src.ingestion.processor @cpapArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Falha no processamento CPAP"
     exit 1
@@ -61,7 +61,7 @@ Write-OK "CPAP processado com sucesso"
 Write-Title "Processando dados Smartband (Xiaomi)"
 
 $bandArgs = @("--patient", $Patient)
-python src/ingestion/smartband_processor.py @bandArgs
+& ".\venv\Scripts\python.exe" -m src.ingestion.smartband_processor @bandArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Falha no processamento Smartband"
     exit 1

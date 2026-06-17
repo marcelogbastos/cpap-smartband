@@ -1,13 +1,14 @@
-version: '3.8'
-
 services:
   app:
     build: .
+    container_name: cpap-dashboard
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - ./.env:/app/.env
+      - ./logs:/app/logs
+    env_file:
+      - .env
     environment:
-      - TZ_OFFSET_HOURS=${TZ_OFFSET_HOURS:-3}
+      - TZ_OFFSET_HOURS=${TZ_OFFSET_HOURS:--3}
     restart: unless-stopped

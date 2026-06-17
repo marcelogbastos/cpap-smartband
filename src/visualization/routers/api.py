@@ -6,8 +6,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from ..schemas.models import PatientDataResponse, SmartbandDataResponse, MonthlySleepTable, MonthlyCpapTable
-from ..services.data_loader import load_cpap_data, load_smartband_table
+from ..schemas.models import PatientDataResponse, SmartbandDataResponse, MonthlySleepTable, MonthlyCpapTable, CorrelationResponse
+from ..services.data_loader import load_cpap_data, load_smartband_table, PROCESSED_BASE_DIR
 from ..services.cpap_scoring import calculate_myair_score
 
 router = APIRouter(prefix="/api")
@@ -20,26 +20,26 @@ def health_check():
 
 @router.get("/patients", response_model=List[str])
 def get_patients():
-    """Retorna a lista de pacientes disponíveis no diretório de dados processados.
+    """Retorna a lista de pacientes disponíveis, varrendo todas as tabelas em data/processed/.
 
-    Procura por partições `patient_slug=` em `data/processed/summary` e, se vazio,
-    tenta inferir pacientes a partir do Parquet de resumo.
+    Detecta qualquer paciente que tenha dados em qualquer tabela (CPAP ou Smartband),
+    não apenas na tabela summary.
     """
     try:
         import os
-        from ..services.data_loader import PROCESSED_DIR
-        if not os.path.exists(PROCESSED_DIR):
+        if not os.path.exists(PROCESSED_BASE_DIR):
             return []
-        patients = []
-        for item in os.listdir(PROCESSED_DIR):
-            if item.startswith("patient_slug="):
-                slug = item.split("=")[1]
-                patients.append(slug.title())
-        if not patients:
-            df = load_cpap_data()
-            if not df.empty:
-                return sorted(df['patient'].unique())
-        return sorted(list(set(patients)))
+
+        slugs: set[str] = set()
+        for table_dir in os.listdir(PROCESSED_BASE_DIR):
+            table_path = os.path.join(PROCESSED_BASE_DIR, table_dir)
+            if not os.path.isdir(table_path):
+                continue
+            for partition in os.listdir(table_path):
+                if partition.startswith("patient_slug="):
+                    slugs.add(partition.split("=")[1])
+
+        return sorted(slug.title() for slug in slugs)
     except Exception as e:
         logger.error(f"Error loading patients: {e}")
         raise HTTPException(status_code=500, detail="Failed to load patient data")
@@ -245,33 +245,111 @@ def get_cpap_monthly_table(patient: str, year: int = Query(None), month: int = Q
         logger.error(f"Error loading monthly CPAP data for {patient}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load monthly CPAP data")
 
-@router.get("/available-periods")
-def get_available_periods(patient: Optional[str] = Query(None)):
-    """Retorna os períodos (anos e meses) disponíveis com dados para um paciente."""
+@router.get("/correlation/{patient}", response_model=CorrelationResponse)
+def get_correlation(patient: str):
+    """Retorna métricas de correlação entre CPAP e sono da Smartband.
+
+    Para cada métrica de sono (sleep_score, sono profundo, REM, tempo acordado),
+    compara a média em noites com bom controle de CPAP (AHI < 5) versus noites
+    com AHI elevado (AHI >= 5), cruzando por data.
+
+    Também retorna os pares (ahi, sleep_score) para exibir um scatter chart.
+    """
     try:
-        if patient:
-            df = load_cpap_data(patient)
-        else:
-            df = load_cpap_data()
-        
+        # --- CPAP: agrega por sessão ---
+        df_cpap_all = load_cpap_data(patient)
+        if df_cpap_all.empty:
+            return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
+
+        df_cpap = df_cpap_all[df_cpap_all['patient'] == patient].copy()
+        if df_cpap.empty:
+            return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
+
+        cpap_by_day = df_cpap.groupby('data_sessao').agg(
+            ahi=('AHI', 'mean'),
+            usage_mins=('usage_mins', 'max'),
+            score=('AHI', 'count')  # placeholder, recalculado abaixo
+        ).reset_index()
+        cpap_by_day['data_sessao'] = cpap_by_day['data_sessao'].astype(str)
+
+        df_sleep = load_smartband_table("smartband_sleep_daily", patient)
+        if df_sleep.empty:
+            return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
+
+        df_sleep_p = df_sleep[df_sleep['patient'].str.lower() == patient.lower()].copy()
+        if df_sleep_p.empty:
+            return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
+
+        df_sleep_p['report_date'] = pd.to_datetime(df_sleep_p['report_date']).dt.strftime('%Y-%m-%d')
+
+        merged = pd.merge(
+            cpap_by_day[['data_sessao', 'ahi', 'usage_mins']],
+            df_sleep_p[['report_date', 'sleep_score', 'deep_min', 'rem_min', 'awake_min', 'total_duration_min']],
+            left_on='data_sessao',
+            right_on='report_date',
+            how='inner'
+        )
+
+        if merged.empty:
+            return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
+
+        for col in ['ahi', 'sleep_score', 'deep_min', 'rem_min', 'awake_min', 'total_duration_min', 'usage_mins']:
+            merged[col] = pd.to_numeric(merged[col], errors='coerce').fillna(0)
+
+        good = merged[merged['ahi'] < 5]
+        bad  = merged[merged['ahi'] >= 5]
+
+        def _avgs(col, higher_better):
+            return {
+                "label": col,
+                "good_nights_avg": round(float(good[col].mean()), 1) if not good.empty else 0.0,
+                "bad_nights_avg":  round(float(bad[col].mean()),  1) if not bad.empty  else 0.0,
+                "n_good": int(len(good)),
+                "n_bad":  int(len(bad)),
+                "direction": "higher_is_better" if higher_better else "lower_is_better",
+            }
+
+        metrics = [
+            _avgs("sleep_score",        True),
+            _avgs("deep_min",           True),
+            _avgs("rem_min",            True),
+            _avgs("awake_min",          False),
+            _avgs("total_duration_min", True),
+        ]
+
+        scatter_pairs = {
+            "ahi":         [round(float(v), 2) for v in merged['ahi'].tolist()],
+            "sleep_score": [round(float(v), 1) for v in merged['sleep_score'].tolist()],
+            "dates":       merged['data_sessao'].tolist(),
+        }
+
+        return {
+            "metrics": metrics,
+            "nights_with_both": int(len(merged)),
+            "ahi_sleep_score_pairs": scatter_pairs,
+        }
+    except Exception as e:
+        logger.error(f"Error loading correlation data for {patient}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load correlation data")
+
+
+@router.get("/available-periods")
+def get_available_periods(patient=None):
+    try:
+        df = load_cpap_data(patient) if patient else load_cpap_data()
         if df.empty:
             return {"periods": []}
-        
         df['data_terapia'] = pd.to_datetime(df['data_terapia'], errors='coerce')
         df = df.dropna(subset=['data_terapia'])
-        
         if df.empty:
             return {"periods": []}
-        
         df['year'] = df['data_terapia'].dt.year
         df['month'] = df['data_terapia'].dt.month
-        
         periods = []
         for year in sorted(df['year'].unique(), reverse=True):
             year_data = df[df['year'] == year]
             for month in sorted(year_data['month'].unique(), reverse=True):
                 periods.append({"year": int(year), "month": int(month)})
-        
         return {"periods": periods}
     except Exception as e:
         logger.error(f"Error loading available periods: {e}")

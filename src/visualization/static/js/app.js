@@ -543,4 +543,108 @@ function hideError() {
     if (el) el.style.display = 'none';
 }
 
+// ─── CORRELAÇÃO ────────────────────────────────────────────────────────────────
+
+const CORR_LABELS = {
+    sleep_score:        { label: 'Score de Sono',  unit: 'pts', direction: 'higher_is_better' },
+    deep_min:           { label: 'Sono Profundo',  unit: 'min', direction: 'higher_is_better' },
+    rem_min:            { label: 'Sono REM',       unit: 'min', direction: 'higher_is_better' },
+    awake_min:          { label: 'Tempo Acordado', unit: 'min', direction: 'lower_is_better'  },
+    total_duration_min: { label: 'Duração Total',  unit: 'min', direction: 'higher_is_better' },
+};
+
+async function loadCorrelation(patient) {
+    if (!patient) return;
+    document.getElementById('correlacao-loading').classList.remove('hidden');
+    document.getElementById('correlacao-empty').classList.add('hidden');
+    document.getElementById('correlacao-content').classList.add('hidden');
+
+    try {
+        const res = await fetch(`/api/correlation/${patient}`);
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+
+        document.getElementById('correlacao-loading').classList.add('hidden');
+
+        if (!data.nights_with_both || data.nights_with_both === 0) {
+            document.getElementById('correlacao-empty').classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('correlacao-content').classList.remove('hidden');
+        document.getElementById('corr-nights-count').textContent = data.nights_with_both;
+
+        // Preencher tabela comparativa
+        const tbody = document.getElementById('corrTableBody');
+        tbody.innerHTML = '';
+        let nGoodSet = false;
+        for (const m of data.metrics) {
+            const meta = CORR_LABELS[m.label] || { label: m.label, unit: '', direction: m.direction };
+            if (!nGoodSet) {
+                document.getElementById('corr-n-good').textContent = `(${m.n_good} noites)`;
+                document.getElementById('corr-n-bad').textContent  = `(${m.n_bad} noites)`;
+                nGoodSet = true;
+            }
+            const diff = m.good_nights_avg - m.bad_nights_avg;
+            const diffSign = diff > 0 ? '+' : '';
+            const goodDir = meta.direction === 'higher_is_better' ? diff > 0 : diff < 0;
+            const diffColor = goodDir ? 'text-green-400' : diff === 0 ? 'text-gray-400' : 'text-red-400';
+
+            tbody.innerHTML += `<tr class="border-b border-gray-800 hover:bg-[#1a1f2e]">
+                <td class="px-3 py-2 text-gray-300">${meta.label}</td>
+                <td class="px-3 py-2 text-green-400 font-semibold">${m.good_nights_avg} ${meta.unit}</td>
+                <td class="px-3 py-2 text-red-400 font-semibold">${m.bad_nights_avg} ${meta.unit}</td>
+                <td class="px-3 py-2 ${diffColor} font-semibold">${diffSign}${diff.toFixed(1)} ${meta.unit}</td>
+            </tr>`;
+        }
+
+        // Scatter: IAH × Sleep Score
+        const pairs = data.ahi_sleep_score_pairs;
+        if (pairs && pairs.ahi && pairs.ahi.length > 0) {
+            const scatterData = pairs.ahi.map((ahi, i) => ({
+                x: ahi, y: pairs.sleep_score[i], date: (pairs.dates || [])[i] || ''
+            }));
+            if (charts['chartCorrelacaoScatter']) { charts['chartCorrelacaoScatter'].destroy(); delete charts['chartCorrelacaoScatter']; }
+            const el = document.getElementById('chartCorrelacaoScatter');
+            if (el) {
+                charts['chartCorrelacaoScatter'] = new Chart(el.getContext('2d'), {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            data: scatterData,
+                            backgroundColor: scatterData.map(p => p.x < 5 ? 'rgba(39,174,96,0.75)' : 'rgba(231,76,60,0.75)'),
+                            pointRadius: 6, pointHoverRadius: 8,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            datalabels: { display: false },
+                            tooltip: { callbacks: { label: (c) => `${c.raw.date} | IAH: ${c.raw.x} | Score: ${c.raw.y}` } }
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'IAH (eventos/h)', color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                            y: { title: { display: true, text: 'Score de Sono', color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.05)' }, min: 0, max: 100 }
+                        }
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Error loading correlation', e);
+        document.getElementById('correlacao-loading').classList.add('hidden');
+        document.getElementById('correlacao-empty').classList.remove('hidden');
+    }
+}
+
+// Carregar correlação ao abrir a aba
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.dataset.tab === 'correlacao') {
+        btn.addEventListener('click', () => {
+            loadCorrelation(document.getElementById('patientSelect').value);
+        });
+    }
+});
+
 fetchPatients();

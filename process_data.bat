@@ -18,7 +18,7 @@ call venv\Scripts\activate.bat
 echo [INFO] Processando dados CPAP...
 echo.
 
-python src\ingestion\processor.py %*
+python -m src.ingestion.processor %*
 
 echo.
 pause

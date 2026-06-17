@@ -1,0 +1,17 @@
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.env
+data/
+logs/
+*.log
+.git/
+.gitignore
+*.md
+docs/
+task/
+scripts/
+*.bat
+*.ps1

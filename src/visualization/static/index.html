@@ -48,6 +48,9 @@
         <button class="tab-btn" data-tab="tabelas">
             <span class="text-lg">📑</span> Tabelas
         </button>
+        <button class="tab-btn" data-tab="correlacao">
+            <span class="text-lg">🔗</span> Correlação
+        </button>
     </div>
 
     <div id="tab-resumo" class="tab-content active">
@@ -339,6 +342,47 @@
                         <tr><td colspan="7" class="px-2 py-2 text-center text-gray-500">Carregando...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: CORRELAÇÃO -->
+    <div id="tab-correlacao" class="tab-content">
+        <div id="correlacao-loading" class="text-center text-gray-500 py-8">Carregando análise de correlação...</div>
+        <div id="correlacao-empty" class="hidden text-center text-gray-500 py-8">
+            Sem noites com dados de CPAP <em>e</em> Smartband na mesma data.
+        </div>
+        <div id="correlacao-content" class="hidden">
+            <div class="mb-4">
+                <p class="text-xs text-gray-400 mb-1">
+                    Noites com dados de ambas as fontes: <span id="corr-nights-count" class="text-white font-semibold"></span>
+                </p>
+                <p class="text-xs text-gray-500">
+                    Compara métricas de sono em noites com IAH controlado (&lt; 5) vs noites com IAH elevado (≥ 5).
+                </p>
+            </div>
+
+            <!-- Tabela comparativa -->
+            <div class="card mb-4 overflow-x-auto">
+                <h2 class="text-xs font-semibold mb-3 text-gray-300">CPAP Controlado (IAH &lt; 5) vs Elevado (IAH ≥ 5)</h2>
+                <table class="w-full text-xs text-left text-gray-300">
+                    <thead class="text-xs uppercase bg-[#161925] text-gray-300 border-b border-gray-700">
+                        <tr>
+                            <th class="px-3 py-2">Métrica</th>
+                            <th class="px-3 py-2 text-green-400">IAH &lt; 5 <span id="corr-n-good" class="text-gray-500 normal-case font-normal"></span></th>
+                            <th class="px-3 py-2 text-red-400">IAH ≥ 5 <span id="corr-n-bad" class="text-gray-500 normal-case font-normal"></span></th>
+                            <th class="px-3 py-2">Diferença</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corrTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Scatter: AHI × Sleep Score -->
+            <div class="card">
+                <h2 class="text-xs font-semibold mb-3 text-gray-300">IAH × Score de Sono</h2>
+                <p class="text-xs text-gray-500 mb-3">Cada ponto é uma noite. Tendência esperada: IAH menor → score de sono maior.</p>
+                <div class="h-56 relative"><canvas id="chartCorrelacaoScatter"></canvas></div>
             </div>
         </div>
     </div>
