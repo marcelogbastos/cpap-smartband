@@ -214,6 +214,10 @@ MIT License — veja [LICENSE](LICENSE) para detalhes.
 
 ## 👤 Autor
 
+**Marcelo G. Bastos** — Criador e mantenedor do projeto.
+
+---
+
 ## ⚙️ Como executar (rápido)
 
 Encontrará instruções detalhadas de execução com e sem Docker em: `docs/documentacao_tecnica.md` (seção "12. Como Executar (Docker / Sem Docker)").
