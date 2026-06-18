@@ -8,6 +8,22 @@ Dashboard clínico integrado para monitoramento de **Apneia do Sono**, combinand
 
 ---
 
+## 📸 Screenshots
+
+### Resumo Noturno
+![Resumo Noturno](img/1-resumo.png)
+
+### Gráficos Mensais
+![Gráficos Mensais](img/2-graficos.png)
+
+### Tabelas de Dados
+![Tabelas](img/3-tabelas.png)
+
+### Correlação CPAP × Sono
+![Correlação](img/4-correlação.png)
+
+---
+
 ## ✨ Funcionalidades
 
 - 📊 **Resumo Noturno** — score CPAP, IAH, fuga, pressão e dados de sono da Smartband para qualquer noite selecionada
@@ -65,7 +81,7 @@ cpap_smartband/
 ### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/<seu-usuario>/cpap_smartband.git
+git clone https://github.com/marcelogbastos/cpap-smartband.git
 cd cpap_smartband
 ```
 
