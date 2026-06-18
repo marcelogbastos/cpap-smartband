@@ -22,12 +22,15 @@ import logging
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
+import sys
+_stream_handler = logging.StreamHandler(stream=sys.stdout)
+_stream_handler.stream.reconfigure(encoding='utf-8', errors='replace') if hasattr(_stream_handler.stream, 'reconfigure') else None
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join(LOGS_DIR, "smartband_processor.log"))
+        _stream_handler,
+        logging.FileHandler(os.path.join(LOGS_DIR, "smartband_processor.log"), encoding='utf-8')
     ]
 )
 logger = logging.getLogger(__name__)

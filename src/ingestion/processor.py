@@ -12,12 +12,15 @@ from src.utils import normalize_patient_name
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
+import sys as _sys
+_sh = logging.StreamHandler(stream=_sys.stdout)
+if hasattr(_sh.stream, 'reconfigure'): _sh.stream.reconfigure(encoding='utf-8', errors='replace')
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join(LOGS_DIR, "processor.log"))
+        _sh,
+        logging.FileHandler(os.path.join(LOGS_DIR, "processor.log"), encoding='utf-8')
     ]
 )
 logger = logging.getLogger(__name__)

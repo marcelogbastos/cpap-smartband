@@ -280,46 +280,54 @@
 
     <div id="tab-graficos" class="tab-content">
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0">
-            <div class="card relative">
-                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pontuação CPAP — myAir (0–100)<br><br><b>Cálculo:</b> Algoritmo ResMed que pondera horas de uso, IAH residual, fuga P95 e consistência de uso. Plotado por data da sessão.<br><br><b>Interpretação:</b> Acompanhe a evolução diária. Queda súbita pode indicar noite com máscara mal-adaptada, fuga excessiva ou baixo tempo de uso.<br><br><b>Faixas:</b><br>🟢 ≥ 70 — Excelente<br>🟡 50 a 69 — Bom<br>🔴 &lt; 50 — Ruim</span></i>
-                <div class="kpi-title justify-start mb-3">Pontuação CPAP</div>
-                <div class="flex items-center gap-3 mb-3 text-xs text-gray-400">
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#22c55e"></span> ≥ 70</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#facc15"></span> 50–69</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#ef4444"></span> &lt; 50</span>
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3 min-w-0">
+                    <div class="kpi-title justify-start flex-shrink-0">Pontuação CPAP</div>
+                    <div class="flex items-center gap-2 text-xs text-gray-400 flex-wrap ml-auto">
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#22c55e"></span> ≥ 70</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#facc15"></span> 50–69</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#ef4444"></span> &lt; 50</span>
+                    </div>
+                    <i class="info-btn flex-shrink-0" style="position:static">?<span class="tooltip"><b>Métrica:</b> Pontuação CPAP — myAir (0–100)<br><br><b>Cálculo:</b> Algoritmo ResMed que pondera horas de uso, IAH residual, fuga P95 e consistência de uso. Plotado por data da sessão.<br><br><b>Interpretação:</b> Acompanhe a evolução diária. Queda súbita pode indicar noite com máscara mal-adaptada, fuga excessiva ou baixo tempo de uso.<br><br><b>Faixas:</b><br>🟢 ≥ 70 — Excelente<br>🟡 50 a 69 — Bom<br>🔴 &lt; 50 — Ruim</span></i>
                 </div>
-                <div id="heatmap-cpap-score" class="overflow-x-auto"></div>
+                <div id="heatmap-cpap-score" class="overflow-x-auto flex justify-center"></div>
             </div>
-            <div class="card relative">
-                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Score do Sono — Smartband (0–100)<br><br><b>Cálculo:</b> Algoritmo da smartband que pondera duração total, eficiência (tempo dormido ÷ tempo na cama), proporção de estágios e tempo acordado. Plotado por data.<br><br><b>Interpretação:</b> Comparar com o CPAP Score: discrepâncias podem indicar que a máquina está compensando a apneia mas o sono ainda é fragmentado por outros fatores.<br><br><b>Faixas:</b><br>🟢 ≥ 80 — Excelente<br>🟡 60 a 79 — Bom<br>🔴 &lt; 60 — Ruim</span></i>
-                <div class="kpi-title justify-start mb-3">Score Sono</div>
-                <div class="flex items-center gap-3 mb-3 text-xs text-gray-400">
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#22c55e"></span> ≥ 80</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#facc15"></span> 60–79</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#ef4444"></span> &lt; 60</span>
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3 min-w-0">
+                    <div class="kpi-title justify-start flex-shrink-0">Score Sono</div>
+                    <div class="flex items-center gap-2 text-xs text-gray-400 flex-wrap ml-auto">
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#22c55e"></span> ≥ 80</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#facc15"></span> 60–79</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#ef4444"></span> &lt; 60</span>
+                    </div>
+                    <i class="info-btn flex-shrink-0" style="position:static">?<span class="tooltip"><b>Métrica:</b> Score do Sono — Smartband (0–100)<br><br><b>Cálculo:</b> Algoritmo da smartband que pondera duração total, eficiência (tempo dormido ÷ tempo na cama), proporção de estágios e tempo acordado. Plotado por data.<br><br><b>Interpretação:</b> Comparar com o CPAP Score: discrepâncias podem indicar que a máquina está compensando a apneia mas o sono ainda é fragmentado por outros fatores.<br><br><b>Faixas:</b><br>🟢 ≥ 80 — Excelente<br>🟡 60 a 79 — Bom<br>🔴 &lt; 60 — Ruim</span></i>
                 </div>
-                <div id="heatmap-sleep-score" class="overflow-x-auto"></div>
+                <div id="heatmap-sleep-score" class="overflow-x-auto flex justify-center"></div>
             </div>
-            <div class="card relative">
-                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> Pressão P95 (cmH₂O)<br><br><b>Cálculo:</b> Percentil 95 da pressão aplicada — em 95% do tempo a pressão ficou ≤ este valor. Plotado por data.<br><br><b>Interpretação:</b> Em APAP (auto-ajustável), a pressão sobe quando há resistência na via aérea. Acompanhar a tendência: aumento progressivo pode indicar piora da apneia (ganho de peso, alergias sazonais). Variação normal: 4–20 cmH₂O.<br><br><b>Faixas:</b><br>🔵 ≤ 12 cmH₂O — Pressão baixa/moderada<br>🟣 12–16 cmH₂O — Pressão elevada<br>🩷 &gt; 16 cmH₂O — Pressão muito elevada</span></i>
-                <div class="kpi-title justify-start mb-3">Pressão (cmH₂O)</div>
-                <div class="flex items-center gap-3 mb-3 text-xs text-gray-400">
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#38bdf8"></span> ≤ 12</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#818cf8"></span> 12–16</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#f472b6"></span> &gt; 16</span>
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3 min-w-0">
+                    <div class="kpi-title justify-start flex-shrink-0">Pressão (cmH₂O)</div>
+                    <div class="flex items-center gap-2 text-xs text-gray-400 flex-wrap ml-auto">
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#38bdf8"></span> ≤ 12</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#818cf8"></span> 12–16</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#f472b6"></span> &gt; 16</span>
+                    </div>
+                    <i class="info-btn flex-shrink-0" style="position:static">?<span class="tooltip"><b>Métrica:</b> Pressão P95 (cmH₂O)<br><br><b>Cálculo:</b> Percentil 95 da pressão aplicada — em 95% do tempo a pressão ficou ≤ este valor. Plotado por data.<br><br><b>Interpretação:</b> Em APAP (auto-ajustável), a pressão sobe quando há resistência na via aérea. Acompanhar a tendência: aumento progressivo pode indicar piora da apneia (ganho de peso, alergias sazonais). Variação normal: 4–20 cmH₂O.<br><br><b>Faixas:</b><br>🔵 ≤ 12 cmH₂O — Pressão baixa/moderada<br>🟣 12–16 cmH₂O — Pressão elevada<br>🩷 &gt; 16 cmH₂O — Pressão muito elevada</span></i>
                 </div>
-                <div id="heatmap-pressure" class="overflow-x-auto"></div>
+                <div id="heatmap-pressure" class="overflow-x-auto flex justify-center"></div>
             </div>
-            <div class="card relative">
-                <i class="info-btn absolute top-2 right-2">?<span class="tooltip"><b>Métrica:</b> IAH — Índice de Apneia-Hipopneia (eventos/hora)<br><br><b>Cálculo:</b> (Apneias + hipopneias) ÷ horas de uso CPAP, exibido por dia ao longo de todos os meses disponíveis.<br><br><b>Interpretação:</b> Permite identificar padrões semanais e tendências mensais. Picos isolados podem indicar fatores pontuais (álcool, posição, alergias).<br><br>🟢 &lt; 5 — Controlado<br>🟡 5 a 15 — Leve<br>🔴 &gt; 15 — Moderado/Grave</span></i>
-                <div class="kpi-title justify-start mb-3">IAH (eventos/h)</div>
-                <div class="flex items-center gap-3 mb-3 text-xs text-gray-400">
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#22c55e"></span> &lt; 5</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#facc15"></span> 5–15</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#ef4444"></span> &gt; 15</span>
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3 min-w-0">
+                    <div class="kpi-title justify-start flex-shrink-0">IAH (eventos/h)</div>
+                    <div class="flex items-center gap-2 text-xs text-gray-400 flex-wrap ml-auto">
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#22c55e"></span> &lt; 5</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#facc15"></span> 5–15</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#ef4444"></span> &gt; 15</span>
+                    </div>
+                    <i class="info-btn flex-shrink-0" style="position:static">?<span class="tooltip"><b>Métrica:</b> IAH — Índice de Apneia-Hipopneia (eventos/hora)<br><br><b>Cálculo:</b> (Apneias + hipopneias) ÷ horas de uso CPAP, exibido por dia ao longo de todos os meses disponíveis.<br><br><b>Interpretação:</b> Permite identificar padrões semanais e tendências mensais. Picos isolados podem indicar fatores pontuais (álcool, posição, alergias).<br><br>🟢 &lt; 5 — Controlado<br>🟡 5 a 15 — Leve<br>🔴 &gt; 15 — Moderado/Grave</span></i>
                 </div>
                 <div id="ahi-heatmap-loading" class="text-center text-gray-500 py-4 text-xs" style="display:none">Carregando...</div>
-                <div id="ahi-heatmap" class="overflow-x-auto"></div>
+                <div id="ahi-heatmap" class="overflow-x-auto flex justify-center"></div>
             </div>
         </div>
 

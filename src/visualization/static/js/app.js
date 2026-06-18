@@ -856,7 +856,10 @@ async function loadAhiHeatmap(patient) {
         }
 
         const byDate = {};
-        data.months.forEach(m => m.days.forEach(d => { byDate[d.date] = d.ahi; }));
+        data.months
+            .filter(m => !currentYear  || !currentMonth ||
+                        (m.year === currentYear && m.month === currentMonth))
+            .forEach(m => m.days.forEach(d => { byDate[d.date] = d.ahi; }));
         renderCalendarHeatmap('ahi-heatmap', byDate,
             v => v < 5 ? '#22c55e' : v <= 15 ? '#facc15' : '#ef4444',
             v => v.toFixed(1), 'ev/h');
