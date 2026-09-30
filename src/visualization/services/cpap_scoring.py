@@ -84,7 +84,8 @@ def calculate_myair_score(row: pd.Series) -> int:
     """Calcula o score myAir a partir de uma linha (Series) de dados CPAP.
 
     Args:
-        row: `pandas.Series` contendo colunas como `usage_mins`, `Leak.95`, `MaskEvents`, `AHI`.
+        row: `pandas.Series` contendo colunas como `usage_mins`, `Leak.95` (L/min),
+            `mask_removals` (ou `MaskEvents`), `AHI`.
 
     Returns:
         Inteiro representando o score combinado.
@@ -93,6 +94,11 @@ def calculate_myair_score(row: pd.Series) -> int:
     if usage_score <= 0:
         return 0
     leak_score = calculate_mask_seal_score(row.get('Leak.95', 0))
-    on_off_score = calculate_mask_on_off_score(row.get('MaskEvents', 0))
+    removals = row.get('mask_removals')
+    if removals is None or pd.isna(removals):
+        # MaskEvents = colocações + retiradas; remoções na noite = MaskEvents/2 - 1
+        events = row.get('MaskEvents', 0)
+        removals = 0 if pd.isna(events) else max(events / 2 - 1, 0)
+    on_off_score = calculate_mask_on_off_score(removals)
     ahi_score = calculate_ahi_score(row.get('AHI', 0))
     return usage_score + leak_score + on_off_score + ahi_score

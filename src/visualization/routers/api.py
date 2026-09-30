@@ -9,8 +9,18 @@ logger = logging.getLogger(__name__)
 from ..schemas.models import PatientDataResponse, SmartbandDataResponse, MonthlySleepTable, MonthlyCpapTable, CorrelationResponse, AhiHeatmapResponse
 from ..services.data_loader import load_cpap_data, load_smartband_table, PROCESSED_BASE_DIR
 from ..services.cpap_scoring import calculate_myair_score
+from ...utils import normalize_patient_name
 
 router = APIRouter(prefix="/api")
+
+
+def _filter_patient(df: pd.DataFrame, patient: str) -> pd.DataFrame:
+    """Filtra paciente usando a mesma normalização das partições Parquet."""
+    if df.empty or 'patient' not in df.columns:
+        return df.copy()
+    patient_slug = normalize_patient_name(patient)
+    patient_slugs = df['patient'].astype(str).map(normalize_patient_name)
+    return df[patient_slugs == patient_slug].copy()
 
 
 @router.get("/health")
@@ -30,16 +40,25 @@ def get_patients():
         if not os.path.exists(PROCESSED_BASE_DIR):
             return []
 
-        slugs: set[str] = set()
-        for table_dir in os.listdir(PROCESSED_BASE_DIR):
+        # slug -> nome de exibição (o nome da pasta do paciente, gravado na coluna 'patient')
+        names: dict[str, str] = {}
+        for table_dir in sorted(os.listdir(PROCESSED_BASE_DIR)):
             table_path = os.path.join(PROCESSED_BASE_DIR, table_dir)
             if not os.path.isdir(table_path):
                 continue
             for partition in os.listdir(table_path):
-                if partition.startswith("patient_slug="):
-                    slugs.add(partition.split("=")[1])
+                if not partition.startswith("patient_slug="):
+                    continue
+                slug = partition.split("=", 1)[1]
+                if slug in names:
+                    continue
+                try:
+                    col = pd.read_parquet(os.path.join(table_path, partition), columns=['patient'])['patient']
+                    names[slug] = str(col.iloc[0]) if len(col) else slug.replace("_", " ").title()
+                except Exception:
+                    names[slug] = slug.replace("_", " ").title()
 
-        return sorted(slug.title() for slug in slugs)
+        return sorted(names.values(), key=normalize_patient_name)
     except Exception as e:
         logger.error(f"Error loading patients: {e}")
         raise HTTPException(status_code=500, detail="Failed to load patient data")
@@ -58,14 +77,15 @@ def get_patient_data(patient: str, start_date: Optional[str] = Query(None), end_
     """
     try:
         df_all = load_cpap_data(patient)
-        df = df_all[df_all['patient'] == patient].copy()
+        df = _filter_patient(df_all, patient)
         if df.empty:
             return {"kpis": {"usage_mins": 0, "ahi": 0, "leak": 0, "score": 0, "mask_events": 0, "leak_95": 0, "mask_on_off": 0, "pressure": 0}, "timeseries": {}}
         
+        # Filtra pela data da sessão (noite), igual aos demais endpoints
         if start_date:
-            df = df[df['data_terapia'] >= pd.Timestamp(start_date)]
+            df = df[df['data_sessao'] >= pd.Timestamp(start_date).date()]
         if end_date:
-            df = df[df['data_terapia'] <= pd.Timestamp(end_date)]
+            df = df[df['data_sessao'] <= pd.Timestamp(end_date).date()]
         
         if df.empty:
             return {"kpis": {"usage_mins": 0, "ahi": 0, "leak": 0, "score": 0, "mask_events": 0, "leak_95": 0, "mask_on_off": 0, "pressure": 0}, "timeseries": {}}
@@ -74,16 +94,19 @@ def get_patient_data(patient: str, start_date: Optional[str] = Query(None), end_
         
         session_df = df.groupby('data_sessao').agg({
             'usage_mins': 'max',
-            'AHI': 'mean',
-            'Leak.95': 'mean',
+            'AHI': 'max',
+            'Leak.95': 'max',
             'MaskEvents': 'max',
-            'BlowPress.95': 'mean'
+            'mask_removals': 'max',
+            'BlowPress.95': 'max'
         }).reset_index()
         
         session_df['score'] = session_df.apply(calculate_myair_score, axis=1)
         session_df['data_sessao'] = session_df['data_sessao'].astype(str)
         
         last = session_df.iloc[-1]
+        # NaN não é JSON válido: valores ausentes viram null
+        session_df = session_df.astype(object).where(pd.notna(session_df), None)
         
         return {
             "kpis": {
@@ -93,7 +116,7 @@ def get_patient_data(patient: str, start_date: Optional[str] = Query(None), end_
                 "score": int(last['score']),
                 "mask_events": float(last['MaskEvents']) if not pd.isna(last['MaskEvents']) else 0,
                 "leak_95": float(last['Leak.95']) if not pd.isna(last['Leak.95']) else 0,
-                "mask_on_off": float(last['MaskEvents']) if not pd.isna(last['MaskEvents']) else 0,
+                "mask_on_off": float(last['mask_removals']) if not pd.isna(last['mask_removals']) else 0,
                 "pressure": float(last['BlowPress.95']) if not pd.isna(last['BlowPress.95']) else 0
             },
             "timeseries": session_df.to_dict(orient="list")
@@ -115,7 +138,7 @@ def get_smartband_daily(patient: str, start_date: Optional[str] = Query(None), e
         res = {"sleep": {}, "activity": {}}
         
         if not df_sleep.empty:
-            df_p = df_sleep[df_sleep['patient'].str.lower() == patient.lower()].copy()
+            df_p = _filter_patient(df_sleep, patient)
             if not df_p.empty:
                 if start_date:
                     df_p = df_p[df_p['report_date'] >= pd.Timestamp(start_date)]
@@ -130,7 +153,7 @@ def get_smartband_daily(patient: str, start_date: Optional[str] = Query(None), e
                     res["sleep"] = df_p.to_dict(orient="list")
                 
         if not df_activity.empty:
-            df_a = df_activity[df_activity['patient'].str.lower() == patient.lower()].copy()
+            df_a = _filter_patient(df_activity, patient)
             if not df_a.empty:
                 if start_date:
                     df_a = df_a[df_a['report_date'] >= pd.Timestamp(start_date)]
@@ -160,7 +183,7 @@ def get_monthly_sleep_table(patient: str, year: int = Query(None), month: int = 
         if df_sleep.empty:
             return {"rows": []}
         
-        df_p = df_sleep[df_sleep['patient'].str.lower() == patient.lower()].copy()
+        df_p = _filter_patient(df_sleep, patient)
         if df_p.empty:
             return {"rows": []}
         
@@ -197,11 +220,9 @@ def get_cpap_monthly_table(patient: str, year: int = Query(None), month: int = Q
         if df_all.empty:
             return {"rows": []}
         
-        df = df_all[df_all['patient'] == patient].copy()
+        df = _filter_patient(df_all, patient)
         if df.empty:
             return {"rows": []}
-        
-        df = df[df['PatientHours'] > 0].copy()
         
         if year and month:
             df['sessao_dt'] = pd.to_datetime(df['data_sessao'])
@@ -213,9 +234,10 @@ def get_cpap_monthly_table(patient: str, year: int = Query(None), month: int = Q
         
         session_df = df.groupby('data_sessao').agg({
             'usage_mins': 'max',
-            'AHI': 'mean',
+            'AHI': 'max',
             'Leak.95': 'max',
             'MaskEvents': 'max',
+            'mask_removals': 'max',
             'MaskPress.95': 'max',
             'TidVol.50': 'max',
             'MinVent.50': 'max',
@@ -229,7 +251,7 @@ def get_cpap_monthly_table(patient: str, year: int = Query(None), month: int = Q
         session_df = session_df.fillna(0)
         session_df['AHI'] = session_df['AHI'].clip(lower=0)
         
-        select_columns = ['data_sessao', 'usage_mins', 'AHI', 'Leak.95', 'MaskEvents', 'score', 'MaskPress.95', 'TidVol.50', 'MinVent.50', 'RespRate.50', 'BlowPress.95']
+        select_columns = ['data_sessao', 'usage_mins', 'AHI', 'Leak.95', 'MaskEvents', 'mask_removals', 'score', 'MaskPress.95', 'TidVol.50', 'MinVent.50', 'RespRate.50', 'BlowPress.95']
         session_df = session_df[select_columns]
         
         rename_map = {
@@ -266,12 +288,12 @@ def get_correlation(patient: str):
         if df_cpap_all.empty:
             return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
 
-        df_cpap = df_cpap_all[df_cpap_all['patient'] == patient].copy()
+        df_cpap = _filter_patient(df_cpap_all, patient)
         if df_cpap.empty:
             return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
 
         cpap_by_day = df_cpap.groupby('data_sessao').agg(
-            ahi=('AHI', 'mean'),
+            ahi=('AHI', 'max'),
             usage_mins=('usage_mins', 'max'),
             score=('AHI', 'count')  # placeholder, recalculado abaixo
         ).reset_index()
@@ -281,7 +303,7 @@ def get_correlation(patient: str):
         if df_sleep.empty:
             return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
 
-        df_sleep_p = df_sleep[df_sleep['patient'].str.lower() == patient.lower()].copy()
+        df_sleep_p = _filter_patient(df_sleep, patient)
         if df_sleep_p.empty:
             return {"metrics": [], "nights_with_both": 0, "ahi_sleep_score_pairs": {}}
 
@@ -346,8 +368,7 @@ def get_ahi_heatmap(patient: str, year: int = Query(None)):
         if df_all.empty:
             return {"months": []}
 
-        df = df_all[df_all['patient'] == patient].copy()
-        df = df[df['PatientHours'] > 0].copy()
+        df = _filter_patient(df_all, patient)
         df['sessao_dt'] = pd.to_datetime(df['data_sessao'], errors='coerce')
         df = df.dropna(subset=['sessao_dt'])
 
@@ -378,23 +399,20 @@ def get_ahi_heatmap(patient: str, year: int = Query(None)):
 
 
 @router.get("/available-periods")
-def get_available_periods(patient=None):
+def get_available_periods(patient: Optional[str] = None):
+    """Lista os meses (ano/mês) com sessões CPAP, do mais recente ao mais antigo."""
     try:
         df = load_cpap_data(patient) if patient else load_cpap_data()
+        if patient:
+            df = _filter_patient(df, patient)
         if df.empty:
             return {"periods": []}
-        df['data_terapia'] = pd.to_datetime(df['data_terapia'], errors='coerce')
-        df = df.dropna(subset=['data_terapia'])
-        if df.empty:
+        # Não altera o DataFrame em cache: trabalha sobre uma Series derivada
+        sess = pd.to_datetime(pd.Series(df['data_sessao'].unique()), errors='coerce').dropna()
+        if sess.empty:
             return {"periods": []}
-        df['year'] = df['data_terapia'].dt.year
-        df['month'] = df['data_terapia'].dt.month
-        periods = []
-        for year in sorted(df['year'].unique(), reverse=True):
-            year_data = df[df['year'] == year]
-            for month in sorted(year_data['month'].unique(), reverse=True):
-                periods.append({"year": int(year), "month": int(month)})
-        return {"periods": periods}
+        ym = sorted({(int(d.year), int(d.month)) for d in sess}, reverse=True)
+        return {"periods": [{"year": y, "month": m} for y, m in ym]}
     except Exception as e:
         logger.error(f"Error loading available periods: {e}")
         raise HTTPException(status_code=500, detail="Failed to load available periods")

@@ -1,6 +1,6 @@
 param(
     [switch]$Reset,
-    [string]$Patient = "marcelo"
+    [string]$Patient = ""   # vazio = todos os pacientes (pastas em data/cpap_sd e data/Smartband)
 )
 
 $ErrorActionPreference = "Continue"
@@ -49,6 +49,7 @@ Write-Title "Processando dados CPAP (cartao SD)"
 
 $cpapArgs = @()
 if ($Reset) { $cpapArgs += "--reset" }
+if ($Patient) { $cpapArgs += @("--patient", $Patient) }
 
 & ".\venv\Scripts\python.exe" -m src.ingestion.processor @cpapArgs
 if ($LASTEXITCODE -ne 0) {
@@ -60,7 +61,8 @@ Write-OK "CPAP processado com sucesso"
 # ===== Smartband =====
 Write-Title "Processando dados Smartband (Xiaomi)"
 
-$bandArgs = @("--patient", $Patient)
+$bandArgs = @()
+if ($Patient) { $bandArgs += @("--patient", $Patient) }
 & ".\venv\Scripts\python.exe" -m src.ingestion.smartband_processor @bandArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Falha no processamento Smartband"

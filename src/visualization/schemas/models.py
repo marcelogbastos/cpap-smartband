@@ -46,6 +46,7 @@ class CpapRow(BaseModel):
     ahi: float
     leak_95: float
     mask_events: float
+    mask_removals: float = 0
     score: int
     pressure: Optional[float] = None
     tidal_volume: Optional[float] = None

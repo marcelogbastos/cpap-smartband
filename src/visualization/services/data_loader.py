@@ -54,7 +54,6 @@ def load_cpap_data(patient=None):
 
     df = pd.read_parquet(path)
     df['data_sessao'] = (df['data_terapia'] - pd.Timedelta(hours=12)).dt.date
-    df = df[df['PatientHours'] > 0].copy()
 
     for p in df['patient'].unique():
         p_mask = df['patient'] == p
@@ -64,6 +63,15 @@ def load_cpap_data(patient=None):
         else:
             df.loc[p_mask, 'usage_mins'] = p_dur
         df.loc[p_mask, 'usage_mins'] = df.loc[p_mask, 'usage_mins'].fillna(0)
+
+    # Só noites com uso real. PatientHours é acumulado (vida do aparelho) e não
+    # serve para detectar dias sem uso; nesses dias o STR.edf não traz valores.
+    df = df[df['usage_mins'] > 0].copy()
+
+    # MaskEvents conta cada colocação E cada retirada da máscara (sempre o dobro
+    # do número de sessões). Remoções durante a noite = sessões - 1.
+    if 'MaskEvents' in df.columns:
+        df['mask_removals'] = (df['MaskEvents'] / 2 - 1).clip(lower=0)
 
     _cpap_cache[cache_key] = df
     _cpap_mtime[cache_key] = current_mtime

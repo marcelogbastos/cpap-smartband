@@ -93,7 +93,7 @@ document.addEventListener('click', (e) => {
 async function loadAvailablePeriods(patient) {
     if (!patient) return;
     try {
-        const res = await fetch(`/api/available-periods?patient=${patient}`);
+        const res = await fetch(`/api/available-periods?patient=${encodeURIComponent(patient)}`);
         if (!res.ok) return;
         const data = await res.json();
         availablePeriods = data.periods;
@@ -182,7 +182,7 @@ async function loadMonthlySleep(patient) {
     if (!patient) patient = document.getElementById('patientSelect').value;
     if (!patient || !currentMonth || !currentYear) return;
     try {
-        const res = await fetch(`/api/smartband/${patient}/monthly-sleep?year=${currentYear}&month=${currentMonth}`);
+        const res = await fetch(`/api/smartband/${encodeURIComponent(patient)}/monthly-sleep?year=${currentYear}&month=${currentMonth}`);
         if (!res.ok) return;
         const data = await res.json();
         sleepData = data.rows.map(row => {
@@ -200,7 +200,7 @@ async function loadMonthlyCpap(patient) {
     if (!patient) patient = document.getElementById('patientSelect').value;
     if (!patient || !currentMonth || !currentYear) return;
     try {
-        const res = await fetch(`/api/cpap/${patient}/monthly?year=${currentYear}&month=${currentMonth}`);
+        const res = await fetch(`/api/cpap/${encodeURIComponent(patient)}/monthly?year=${currentYear}&month=${currentMonth}`);
         if (!res.ok) return;
         const data = await res.json();
         cpapData = data.rows;
@@ -329,12 +329,12 @@ async function loadPatientData(patient) {
     if (!patient) return;
     showSpinner(true);
     try {
-        const res = await fetch(`/api/data/${patient}`);
+        const res = await fetch(`/api/data/${encodeURIComponent(patient)}`);
         if (!res.ok) throw new Error(`API retornou ${res.status}`);
         const data = await res.json();
         let miData = { sleep: {}, activity: {} };
         try {
-            const resMi = await fetch(`/api/smartband/${patient}/daily`);
+            const resMi = await fetch(`/api/smartband/${encodeURIComponent(patient)}/daily`);
             if (resMi.ok) miData = await resMi.json();
         } catch (e) { console.error("Error loading MiFitness", e); }
         currentPatientData = data;
@@ -363,6 +363,11 @@ async function loadPatientData(patient) {
     }
 }
 
+// Cores das remoções de máscara (mesmas faixas do tooltip): 0 / até 3 / mais de 3
+function maskColor(v) {
+    return v < 0.5 ? 'text-green-400' : v <= 3 ? 'text-yellow-400' : 'text-red-400';
+}
+
 function updateKPIs(data, miData) {
     const ts = data.timeseries;
     const dates = ts.data_sessao || [];
@@ -382,7 +387,7 @@ function updateKPIs(data, miData) {
         usageMins = ts.usage_mins && ts.usage_mins[idx] ? ts.usage_mins[idx] : 0;
         ahi = ts.AHI && ts.AHI[idx] ? ts.AHI[idx] : 0;
         leak = ts['Leak.95'] && ts['Leak.95'][idx] ? ts['Leak.95'][idx] : 0;
-        maskEvents = ts.mask_events && ts.mask_events[idx] ? ts.mask_events[idx] : 0;
+        maskEvents = ts.mask_removals && ts.mask_removals[idx] ? ts.mask_removals[idx] : 0;
         pressure = ts['BlowPress.95'] && ts['BlowPress.95'][idx] ? ts['BlowPress.95'][idx] : 0;
     }
     
@@ -406,6 +411,7 @@ function updateKPIs(data, miData) {
     document.getElementById('kpi-leak-top').textContent = idx >= 0 ? leak.toFixed(1) : '--';
     document.getElementById('kpi-leak-top').className = `font-bold text-sm ${leak <= 24 ? 'text-green-400' : 'text-red-400'}`;
     document.getElementById('kpi-mask-top').textContent = idx >= 0 ? Math.round(maskEvents) : '--';
+    document.getElementById('kpi-mask-top').className = `font-bold text-sm ${idx < 0 ? 'text-gray-400' : maskColor(maskEvents)}`;
     document.getElementById('kpi-pressure-top').textContent = idx >= 0 ? pressure.toFixed(1) : '--';
 
     // Reset smartband fields in case there is no data
@@ -453,38 +459,49 @@ function updateKPIs(data, miData) {
     }
 }
 
+// Data 'YYYY-MM-DD' que inicia uma janela de `days` dias terminando em `endDate`
+// (inclusive). days = 0 significa "todo o período" (retorna null).
+function periodStartDate(endDate, days) {
+    if (!endDate || !days) return null;
+    const [y, m, d] = endDate.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() - (days - 1));
+    return dt.toISOString().slice(0, 10);
+}
+
+// Índices de `dates` (strings 'YYYY-MM-DD') dentro de [start, end]; start null = sem limite.
+function indicesInWindow(dates, start, end) {
+    const out = [];
+    (dates || []).forEach((d, i) => {
+        if ((!start || d >= start) && (!end || d <= end)) out.push(i);
+    });
+    return out;
+}
+
 function updateAverages(data, miData) {
     const ts = data.timeseries;
     const dates = ts.data_sessao || [];
     
-    let endIdx = dates.length;
-    if (globalSelectedDate) {
-        const foundIdx = dates.indexOf(globalSelectedDate);
-        if (foundIdx !== -1) endIdx = foundIdx + 1;
-    }
-    
-    let startIdx;
-    if (globalSelectedPeriod === 0) {
-        startIdx = 0;
-    } else {
-        startIdx = Math.max(0, endIdx - globalSelectedPeriod);
-    }
-    const periodDates = dates.slice(startIdx, endIdx);
-    
-    const firstD = periodDates.length > 0 ? periodDates[0] : null;
-    const lastD = periodDates.length > 0 ? periodDates[periodDates.length - 1] : null;
+    // Janela por dias do calendário (não por quantidade de registros):
+    // "7 dias" = a data selecionada e os 6 dias anteriores, com ou sem sessão.
+    const windowEnd = globalSelectedDate || (dates.length ? dates[dates.length - 1] : null);
+    const windowStart = periodStartDate(windowEnd, globalSelectedPeriod);
+    const idxs = indicesInWindow(dates, windowStart, windowEnd);
+    const pick = (arr) => idxs.map(i => (arr || [])[i]).filter(v => v != null);
+    const firstD = windowStart || (idxs.length ? dates[idxs[0]] : null);
+    const lastD = windowEnd;
     if (firstD && lastD) {
         document.getElementById('resumo-dias-title').textContent = ` - ${formatDateBR(firstD)} a ${formatDateBR(lastD)}`;
     } else {
         document.getElementById('resumo-dias-title').textContent = ' - Sem período selecionado';
     }
     
-    const usage = (ts.usage_mins || []).slice(startIdx, endIdx);
-    const scores = (ts.score || []).slice(startIdx, endIdx);
-    const ahis = (ts.AHI || []).slice(startIdx, endIdx);
-    const leaks = (ts['Leak.95'] || []).slice(startIdx, endIdx);
-    const press = (ts['BlowPress.95'] || []).slice(startIdx, endIdx);
-    const masks = (ts.mask_events || []).slice(startIdx, endIdx);
+    const usage = pick(ts.usage_mins);
+    const scores = pick(ts.score);
+    const ahis = pick(ts.AHI);
+    const leaks = pick(ts['Leak.95']);
+    const press = pick(ts['BlowPress.95']);
+    const masks = pick(ts.mask_removals);
 
     const avgUsage = usage.length ? usage.reduce((a, b) => a + b, 0) / usage.length / 60 : 0;
     const avgAhi = ahis.length ? ahis.reduce((a, b) => a + b, 0) / ahis.length : 0;
@@ -497,7 +514,8 @@ function updateAverages(data, miData) {
     document.getElementById('avg-ahi').textContent = avgAhi.toFixed(1);
     document.getElementById('avg-leak').textContent = avgLeak.toFixed(1);
     document.getElementById('avg-pressure').textContent = avgPress.toFixed(1);
-    document.getElementById('avg-mask').textContent = Math.round(avgMask);
+    document.getElementById('avg-mask').textContent = masks.length ? avgMask.toFixed(1) : '--';
+    document.getElementById('avg-mask').className = `font-bold text-sm ${masks.length ? maskColor(avgMask) : 'text-gray-400'}`;
 
     // CPAP Score circle
     const avgScoreRounded = Math.round(avgScore);
@@ -522,32 +540,16 @@ function updateAverages(data, miData) {
 
     if (miData.sleep && miData.sleep.total_duration_min) {
         const miDates = miData.sleep.report_date || [];
-        let miEndIdx = miDates.length;
-        if (globalSelectedDate) {
-            const foundMiIdx = miDates.indexOf(globalSelectedDate);
-            if (foundMiIdx !== -1) miEndIdx = foundMiIdx + 1;
-            else {
-                // find closest date before selected
-                let closest = -1;
-                for(let i=0; i<miDates.length; i++) {
-                    if (miDates[i] <= globalSelectedDate) closest = i;
-                }
-                miEndIdx = closest !== -1 ? closest + 1 : 0;
-            }
-        }
-        let miStartIdx;
-        if (globalSelectedPeriod === 0) {
-            miStartIdx = 0;
-        } else {
-            miStartIdx = Math.max(0, miEndIdx - globalSelectedPeriod);
-        }
-        
-        const sleepVals = miData.sleep.total_duration_min.slice(miStartIdx, miEndIdx);
-        const sleepScores = miData.sleep.sleep_score ? miData.sleep.sleep_score.slice(miStartIdx, miEndIdx) : [];
-        const rems = (miData.sleep.rem_min || []).slice(miStartIdx, miEndIdx);
-        const deeps = (miData.sleep.deep_min || []).slice(miStartIdx, miEndIdx);
-        const lights = (miData.sleep.light_min || []).slice(miStartIdx, miEndIdx);
-        const awakes = (miData.sleep.awake_min || []).slice(miStartIdx, miEndIdx);
+        const miEnd = windowEnd || (miDates.length ? miDates[miDates.length - 1] : null);
+        const miIdxs = indicesInWindow(miDates, periodStartDate(miEnd, globalSelectedPeriod), miEnd);
+        const miPick = (arr) => miIdxs.map(i => (arr || [])[i]).filter(v => v != null);
+
+        const sleepVals = miPick(miData.sleep.total_duration_min);
+        const sleepScores = miPick(miData.sleep.sleep_score);
+        const rems = miPick(miData.sleep.rem_min);
+        const deeps = miPick(miData.sleep.deep_min);
+        const lights = miPick(miData.sleep.light_min);
+        const awakes = miPick(miData.sleep.awake_min);
 
         const avgSleep = sleepVals.length ? sleepVals.reduce((a, b) => a + b, 0) / sleepVals.length / 60 : 0;
         const avgSleepScore = sleepScores.length ? sleepScores.reduce((a, b) => a + b, 0) / sleepScores.length : 0;
@@ -612,7 +614,7 @@ async function loadCorrelation(patient) {
     document.getElementById('correlacao-content').classList.add('hidden');
 
     try {
-        const res = await fetch(`/api/correlation/${patient}`);
+        const res = await fetch(`/api/correlation/${encodeURIComponent(patient)}`);
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
 
@@ -846,7 +848,7 @@ async function loadAhiHeatmap(patient) {
     container.innerHTML = '';
 
     try {
-        const res = await fetch(`/api/cpap/${patient}/ahi-heatmap`);
+        const res = await fetch(`/api/cpap/${encodeURIComponent(patient)}/ahi-heatmap`);
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
 

@@ -26,7 +26,8 @@ CPAP-ResMed/
 │   │       ├── *_PLD.edf            # Carga pulmonar
 │   │       └── *_SAD.edf            # Saturação/desaturação
 │   ├── Smartband/                   # CSVs exportados do Xiaomi Mi Fitness
-│   │   └── *_Smartband_*.csv
+│   │   └── <paciente>/              # Mesmo nome da pasta em cpap_sd/
+│   │       └── AAAAMMDD_<UID>_MiFitness_*.csv
 │   └── processed/                   # Dados processados em Parquet
 │       ├── summary/                 # CPAP: particionado por patient_slug
 │       ├── smartband_sleep/         # Sono bruto (sessões)
@@ -78,8 +79,7 @@ CPAP-ResMed/
 | Pandas      | ≥2.0.0        | Manipulação de dados tabulares        |
 | PyArrow     | ≥12.0.0       | Leitura/escrita Parquet com partições |
 | Pydantic    | ≥2.0.0        | Validação de schemas de resposta      |
-| MNE         | ≥1.5.0        | Leitura de arquivos EDF+ (STR.edf)    |
-| PyEDFlib    | ≥0.1.35       | Leitura alternativa de EDF            |
+| NumPy       | ≥1.24.0       | Leitura binária do STR.edf (leitor EDF próprio) |
 
 ### Frontend (CDN, carregado no navegador)
 
@@ -103,16 +103,18 @@ CPAP-ResMed/
 
 **Processo:**
 1. `CPAPIngestion.__init__(reset=False)` — define diretórios, opcionalmente limpa dados existentes
-2. `read_str_edf(file_path)` → usa `mne.io.read_raw_edf()` para carregar o EDF
-   - Extrai `raw.ch_names` (canais: 81 sinais como `AHI`, `Leak.95`, `MinVent.50`, etc.)
-   - Constrói DataFrame com `raw.get_data().T` usando os nomes dos canais como colunas
-   - Gera timestamps via `raw.times` (cada amostra = intervalo de `1/sfreq` segundos ≈ 2.4h)
-   - `sfreq ≈ 0.0001157 Hz` → 10 amostras por dia
+2. `read_str_edf(file_path)` → usa `read_resmed_str()`, um leitor EDF próprio (NumPy)
+   - 1 registro EDF = 1 dia (inicia ao meio-dia) → **1 linha por dia**
+   - Só sinais com 1 amostra/registro viram colunas (`AHI`, `Leak.95`, `Duration`, `MaskEvents`...);
+     `MaskOn`/`MaskOff` (10 amostras/dia) são ignorados
+   - Valor digital `-1` (convenção ResMed para "sem dado") → `NaN`
+   - `Leak.*` é convertido de L/s (unidade do arquivo) para **L/min**
 3. `process_all_users()` → itera sobre pastas em `data/cpap_sd/`, processa STR.edf de cada paciente
 4. `save_to_parquet(df, table_name, dedupe_keys)`:
    - Particiona por `patient_slug` (nome normalizado: sem acentos, lowercase, underscores)
-   - Se partição já existe e `reset=False`: carrega dados existentes, combina com novos, remove duplicatas por `[patient, data_terapia]`
-   - Se há registros novos: sobrescreve a partição com `pq.write_to_dataset()`
+   - Se partição já existe e `reset=False`: carrega dados existentes, combina com novos e remove duplicatas por `[patient, data_terapia]` mantendo **a leitura mais recente** (`keep='last'`)
+   - Dados no formato antigo (várias linhas reamostradas por dia, gerados pelo leitor MNE) são detectados e descartados automaticamente
+   - A partição é regravada com `pq.write_to_dataset()`
 
 **Chave de desduplicação:** `["patient", "data_terapia"]`
 
@@ -121,9 +123,29 @@ CPAP-ResMed/
 - Caso contrário, mantém em minutos
 - Preenche NaN com 0
 
+### 4.1b CPAP — sessões detalhadas (`datalog_processor.py`)
+
+**Entrada:** `data/cpap_sd/<paciente>/DATALOG/<AAAAMMDD>/<AAAAMMDD_HHMMSS>_*.edf` — chamado pelo `processor.py`.
+
+| Arquivo | Conteúdo | Tabela Parquet |
+|---|---|---|
+| `*_EVE.edf` | Anotações EDF+: apneia central/obstrutiva/não classificada, hipopneia, despertar (horário e duração) | `cpap_events` |
+| `*_PLD.edf` | Pressão na máscara, pressão alvo, EPR, fuga, freq. respiratória, volume, ventilação, ronco, limitação de fluxo (a cada 2 s) — agregados em janelas de 30 s; fuga em L/min | `cpap_signals` |
+| `*_SAD.edf` | Pulso e SpO₂ do oxímetro (só com oxímetro conectado; sessões vazias são ignoradas) | `cpap_oximetry` |
+
+- A noite de cada registro é `início − 12 h` (mesma regra do STR.edf).
+- Gravação por sessão: sessões presentes no cartão substituem as antigas; sessões que já saíram do cartão são preservadas.
+- `*_BRP.edf` (fluxo a 25 Hz) e `*_CSL.edf` não são processados.
+
 ### 4.2 Smartband — `smartband_processor.py`
 
-**Entrada:** `data/Smartband/*_Smartband_*.csv` (5 tipos de tabela)
+**Entrada:** `data/Smartband/<paciente>/AAAAMMDD_<UID>_MiFitness_<tabela>.csv`
+
+- Uma pasta por paciente, com o **mesmo nome** da pasta em `data/cpap_sd/` — é o nome da pasta que liga os dados do CPAP aos da Smartband.
+- Se houver mais de uma exportação na pasta, usa a mais recente (data no nome do arquivo). Um aviso é emitido se a pasta misturar contas Mi Fitness diferentes (UIDs distintos).
+- CSVs soltos direto em `data/Smartband/` são ignorados (com aviso).
+
+**Fases do sono:** a tabela `smartband_sleep_stages` guarda cada intervalo (início, fim, fase) com a noite calculada por `início − 12 h`. Códigos do Mi Fitness (campo `state`), conferidos contra os totais do próprio registro: **2 = profundo, 3 = leve, 4 = REM, 5 = acordado**.
 
 **Tabelas processadas:**
 
@@ -209,7 +231,7 @@ Composto por 4 sub-scores (total 0–100):
 |----------------|-----------|------------------------------------------------------|
 | Uso (usage)    | 70        | 10 pts por hora de uso, limitado a 7h                |
 | Selo Máscara   | 20        | 20 se ≤16 L/min, decresce 1 pt a cada 2 L/min, 0 se ≥55 |
-| Remoções       | 5         | 5 se ≤2, 4 se 3, 3 se 4, 1 se 5, 0 se ≥6           |
+| Remoções       | 5         | 5 se ≤2, 4 se 3, 3 se 4, 1 se 5, 0 se ≥6 — remoções = `MaskEvents ÷ 2 − 1` (MaskEvents conta colocações e retiradas) |
 | AHI            | 5         | 5 se <7, 4 se <10, 3 se <13, 2 se <16, 1 se <19, 0 se ≥19 |
 
 ---
@@ -301,12 +323,12 @@ data/processed/
 
 **`update_data.ps1`:**
 ```
-.\update_data.ps1 [-Reset] [-Patient <slug>]
+.\update_data.ps1 [-Reset] [-Patient <nome>]   # sem -Patient: todos os pacientes
 ```
 
 Executa em sequência:
-1. `src/ingestion/processor.py [--reset]` — processa STR.edf do cartão SD
-2. `src/ingestion/smartband_processor.py --patient <slug>` — processa CSVs Smartband
+1. `python -m src.ingestion.processor [--reset] [--patient <nome>]` — processa o STR.edf de cada pasta em `data/cpap_sd/`
+2. `python -m src.ingestion.smartband_processor [--patient <nome>]` — processa cada pasta em `data/Smartband/`
 
 **`process_data.bat`:**
 ```
@@ -318,11 +340,11 @@ Executa apenas o pipeline CPAP (sem Smartband).
 ### 8.3 Processadores Individuais
 
 ```bash
-# CPAP
-python src/ingestion/processor.py [--reset]
+# CPAP (todos os pacientes, ou um só com --patient)
+python -m src.ingestion.processor [--reset] [--patient Marcelo]
 
 # Smartband
-python src/ingestion/smartband_processor.py [--patient marcelo]
+python -m src.ingestion.smartband_processor [--patient Marcelo]
 ```
 
 ---
@@ -344,8 +366,8 @@ python src/ingestion/smartband_processor.py [--patient marcelo]
 
 ## 10. Decisões Técnicas Relevantes
 
-### 10.1 Uso do MNE para EDF
-A biblioteca MNE (originalmente para EEG/MEG) é usada para ler o STR.edf porque o Python Carestream/EDFlib padrão não lida corretamente com os metadados de tempo dos EDFs do ResMed. O MNE parseia corretamente `meas_date` e `sfreq`.
+### 10.1 Leitor EDF próprio para o STR.edf
+O STR.edf mistura sinais com 1 amostra/dia e sinais com 10 amostras/dia (`MaskOn`/`MaskOff`). O MNE (usado até a versão anterior) reamostra todos os sinais para a maior taxa e interpola, o que distorce os valores diários (IAH, uso e eventos inflados; valores negativos em dias sem uso). O pyedflib recusa o arquivo porque o cabeçalho da ResMed não é 100% conforme (ex.: unidade `Â°C`). Como o formato EDF é simples, o projeto lê o arquivo diretamente com NumPy, cada sinal na sua taxa nativa.
 
 ### 10.2 Sessão Noon-to-Noon
 `data_sessao = data_terapia - 12h` → garante que uma sessão de sono que começa às 22:00 e termina às 06:00 do dia seguinte seja contabilizada como uma única noite.
@@ -398,6 +420,13 @@ Os sinais do STR.edf oscilam ao longo da sessão (ex.: AHI varia sinusoidalmente
 ### `GET /api/smartband/{patient}/monthly-sleep`
 **Query params:** `year`, `month` (opcionais)
 
+### Normalização do paciente
+
+As rotas que recebem `{patient}` filtram o nome usando a mesma normalização das
+partições Parquet: minúsculas, remoção de acentos e conversão de espaços para
+underscore. Portanto, `Marcelo`, `marcelo` e `MARCELO` identificam o mesmo
+paciente.
+
 ---
 
 ## 12. Como Executar (Docker / Sem Docker)
@@ -449,8 +478,8 @@ pip install -r requirements.txt
 # Opcional: copie exemplo de variáveis
 copy .env.example .env
 # Processar dados (CPAP + Smartband)
-python src/ingestion/processor.py
-python src/ingestion/smartband_processor.py --patient marcelo
+python -m src.ingestion.processor
+python -m src.ingestion.smartband_processor
 # Iniciar servidor
 uvicorn src.visualization.app:app --host 127.0.0.1 --port 8000 --reload
 ```
@@ -462,17 +491,23 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python src/ingestion/processor.py
-python src/ingestion/smartband_processor.py --patient marcelo
+python -m src.ingestion.processor
+python -m src.ingestion.smartband_processor
 uvicorn src.visualization.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Dicas:
 - Para reprocessar tudo use `--reset` no `processor.py` ou rode `.\update_data.ps1 -Reset`.
 - Logs são gravados em `logs/processor.log` e `logs/smartband_processor.log` por padrão.
-- Se houver problemas com dependências de `mne` ou `pyedflib`, tente instalar pacotes de sistema necessários (ex.: `libatlas`, `fftw`) ou usar a imagem Docker que já inclui essas dependências.
+- O leitor do STR.edf não depende de bibliotecas de sistema; basta `pip install -r requirements.txt`.
 
 12.3. Testes rápidos
+
+Suíte completa:
+
+```bash
+python -m unittest tests.test_api_helpers tests.test_processing tests.test_analysis
+```
 
 Executar teste rápido unitário (criação simples) para `calculate_myair_score` (exemplo):
 
@@ -480,7 +515,7 @@ Executar teste rápido unitário (criação simples) para `calculate_myair_score
 python - <<'PY'
 from src.visualization.services.cpap_scoring import calculate_myair_score
 import pandas as pd
-row = pd.Series({'usage_mins': 300, 'Leak.95': 10, 'MaskEvents': 0, 'AHI': 4})
+row = pd.Series({'usage_mins': 300, 'Leak.95': 10, 'mask_removals': 0, 'AHI': 4})
 print(calculate_myair_score(row))
 PY
 ```
@@ -556,6 +591,18 @@ python -m uvicorn src.visualization.app:app --host 127.0.0.1 --port 8000
 
 Acesso: http://127.0.0.1:8000
 
+### CORS
+
+Por padrão, a API aceita requisições do dashboard em:
+
+```env
+CPAP_CORS_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+```
+
+Para permitir outras origens, defina `CPAP_CORS_ORIGINS` no arquivo `.env` como
+uma lista de URLs separadas por vírgula. Evite usar `*` em ambientes com dados
+reais.
+
 ---
 
 ## 15. Volumetria (Maio/2026)
@@ -567,3 +614,14 @@ Acesso: http://127.0.0.1:8000
 | Smartband sleep daily| ~37       | ~37 dias |
 | Smartband vitals     | ~500+     | ~37 dias |
 | Smartband activity   | ~37       | ~37 dias |
+
+---
+
+## Abas de análise
+
+Cálculos em `src/visualization/services/analysis.py` (funções puras, testadas em `tests/test_analysis.py`); endpoints em `src/visualization/routers/analysis.py`.
+
+- **Tendências** (`/api/trends`): calendário completo (dias sem uso = 0 h). Adesão = % dos dias com uso ≥ 4 h (meta 70%), também em janela móvel de 30 dias. Índices médios do período ponderados pelas horas de uso (eventos totais ÷ horas). Pressão P95 "no máximo" quando ≥ máx. configurado − 0,2 cmH₂O (só AutoSet). Pontos de atenção gerados por `observations()` — texto factual, sem diagnóstico.
+- **Noite detalhada** (`/api/night`): janela = sessões do CPAP ∪ sono da pulseira (± 15 min). Cada evento recebe a fase do sono em que ocorreu; a taxa por fase usa só o tempo daquela fase com a máscara em uso (mínimo de 15 min).
+- **Correlação** (`/api/correlation/.../matrix` e `/pair`): Spearman com p-valor por permutação (sem SciPy); marcação de "poucas noites" abaixo de 20. Registros da pulseira com 0 min de profundo/REM ou score 0 são tratados como ausentes.
+- **Relatório** (`/relatorio`): página A4 imprimível com resumo, pontos de atenção, gráficos de uso e IAH por tipo, configuração, piores noites e sono da pulseira.
