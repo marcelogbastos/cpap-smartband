@@ -125,7 +125,7 @@ def get_report(patient: str, start: Optional[str] = Query(None), end: Optional[s
             sd = pd.to_datetime(sleep["report_date"]).dt.normalize()
             s = sleep[(sd >= pd.Timestamp(d0)) & (sd <= pd.Timestamp(d1))]
             if len(s):
-                num = lambda c: pd.to_numeric(s[c], errors="coerce").replace(0, pd.NA).astype(float)
+                num = lambda c: pd.to_numeric(s[c], errors="coerce").astype(float).replace(0, float("nan"))
                 sleep_summary = {
                     "nights": int(len(s)),
                     "score_avg": an._num(num("sleep_score").mean(), 1),

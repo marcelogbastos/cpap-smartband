@@ -91,6 +91,26 @@ class TrendsTests(unittest.TestCase):
         self.assertEqual(ch[0]["date"], "2026-09-06")
         self.assertEqual((ch[0]["from"]["set_max"], ch[0]["to"]["set_max"]), (11.0, 13.0))
 
+    def test_medians_match_resscan_criteria(self):
+        s = an.compute_trends(self.df)["summary"]
+        self.assertEqual(s["ahi_median"], 3.0)             # mediana de [2, 4, 6, 1, 8, 2, 3]
+        self.assertEqual(s["cai_median"], 2.0)
+        self.assertEqual(s["usage_median_used_nights_h"], 5.0)
+        self.assertEqual((s["nights_short"], s["nights_unused"]), (2, 3))
+        self.assertEqual(s["leak95_median"], 10.0)
+
+    def test_pressure_prefers_device_target(self):
+        df = self.df.copy()
+        df["TgtIPAP.95"] = df["MaskPress.95"] + 0.1
+        t = an.compute_trends(df)
+        self.assertAlmostEqual(t["days"][0]["press95"], 9.1)
+
+    def test_epr_enable_flag_in_settings(self):
+        df = self.df.copy()
+        df["S.EPR.EPREnable"] = 0.0
+        cs = an.compute_trends(df)["current_settings"]
+        self.assertEqual((cs["epr"], cs["epr_on"]), (1.0, 0.0))
+
 
 class NightTests(unittest.TestCase):
     def test_night_of_uses_noon_to_noon(self):

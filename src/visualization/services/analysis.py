@@ -33,6 +33,14 @@ def _col(df, name):
     return df[name] if name in df.columns else pd.Series(np.nan, index=df.index)
 
 
+def _first_col(df, *names):
+    """Primeira coluna existente e com algum valor (ex.: pressão-alvo, senão pressão na máscara)."""
+    for name in names:
+        if name in df.columns and df[name].notna().any():
+            return df[name]
+    return pd.Series(np.nan, index=df.index)
+
+
 def _records(df: pd.DataFrame, nd=2) -> List[dict]:
     out = []
     for row in df.to_dict(orient="records"):
@@ -75,10 +83,15 @@ def nightly_cpap(df: pd.DataFrame) -> pd.DataFrame:
         "usage_h": d["usage_mins"] / 60.0,
         "ahi": _col(d, "AHI"), "oai": _col(d, "OAI"), "cai": _col(d, "CAI"),
         "uai": _col(d, "UAI"), "hi": _col(d, "HI"),
+        "ai": _col(d, "AI"), "rin": _col(d, "RIN"), "csr": _col(d, "CSR"),
         "leak50": _col(d, "Leak.50"), "leak95": _col(d, "Leak.95"), "leak_max": _col(d, "Leak.Max"),
-        "press50": _col(d, "MaskPress.50"), "press95": _col(d, "MaskPress.95"), "press_max": _col(d, "MaskPress.Max"),
+        # Pressão-alvo do aparelho (TgtIPAP), a mesma que o ResScan exibe; a pressão
+        # medida na máscara (MaskPress) fica como alternativa se o alvo não existir.
+        "press50": _first_col(d, "TgtIPAP.50", "MaskPress.50"),
+        "press95": _first_col(d, "TgtIPAP.95", "MaskPress.95"),
+        "press_max": _first_col(d, "TgtIPAP.Max", "MaskPress.Max"),
         "resp_rate": _col(d, "RespRate.50"), "mask_removals": _col(d, "mask_removals"),
-        "mode": _col(d, "Mode"), "epr": _col(d, "S.EPR.Level"),
+        "mode": _col(d, "Mode"), "epr": _col(d, "S.EPR.Level"), "epr_on": _col(d, "S.EPR.EPREnable"),
     })
     rng = d.apply(lambda r: pressure_range(r), axis=1, result_type="expand") if not d.empty else None
     out["set_min"] = rng[0].values if rng is not None else np.nan
@@ -112,7 +125,7 @@ def compute_trends(df: pd.DataFrame, start: Optional[str] = None, end: Optional[
 
     # mudanças de configuração ao longo do tempo
     changes = []
-    cfg_cols = ["mode", "set_min", "set_max", "epr"]
+    cfg_cols = ["mode", "set_min", "set_max", "epr", "epr_on"]
     prev = None
     for date, row in nights.set_index("date")[cfg_cols].iterrows():
         cur = tuple(None if pd.isna(v) else float(v) for v in row.values)
@@ -154,6 +167,9 @@ def summarize_period(daily: pd.DataFrame) -> dict:
         m = s.notna() & (w > 0)
         return _num((s[m] * w[m]).sum() / w[m].sum()) if m.any() and w[m].sum() > 0 else None
 
+    def med(col, nd=2):  # mediana das noites usadas (= critério do ResScan)
+        return _num(used[col].median(), nd) if col in used and used[col].notna().any() else None
+
     ahi = wavg("ahi")
     cai, oai, hi, uai = wavg("cai"), wavg("oai"), wavg("hi"), wavg("uai")
     central_share = _num(100 * cai / ahi, 1) if ahi and cai is not None else None
@@ -168,16 +184,24 @@ def summarize_period(daily: pd.DataFrame) -> dict:
         "adherence_ok": bool(100 * daily["adherent"].mean() >= ADHERENCE_TARGET),
         "usage_avg_all_days_h": _num(daily["usage_h"].mean()),
         "usage_avg_used_nights_h": _num(w.mean()) if len(w) else None,
-        "total_hours": _num(total_h, 1),
-        "ahi_avg": ahi, "ahi_median": _num(used["ahi"].median()),
+        "usage_median_used_nights_h": _num(w.median()) if len(w) else None,
+        "nights_short": int(len(used) - daily["adherent"].sum()),
+        "nights_unused": int(n_days - len(used)),
+        "total_hours": _num(total_h, 2),
+        "ahi_avg": ahi, "ahi_median": med("ahi"),
         "ahi_max": _num(used["ahi"].max()),
+        # medianas das noites — mesmos números do relatório ResScan da ResMed
+        "ai_median": med("ai"), "cai_median": med("cai"), "oai_median": med("oai"),
+        "hi_median": med("hi"), "uai_median": med("uai"), "rin_median": med("rin"), "csr_median": med("csr"),
         "nights_ahi_ge_5": int((used["ahi"] >= 5).sum()),
         "oai_avg": oai, "cai_avg": cai, "hi_avg": hi, "uai_avg": uai,
         "central_share_pct": central_share,
         "leak95_avg": _num(used["leak95"].mean()), "leak95_max": _num(used["leak95"].max()),
+        "leak50_median": med("leak50"), "leak95_median": med("leak95"), "leak_max_median": med("leak_max"),
         "nights_leak_gt_24": int((used["leak95"] > 24).sum()),
         "press95_avg": _num(used["press95"].mean()),
         "press50_avg": _num(used["press50"].mean()),
+        "press50_median": med("press50"), "press95_median": med("press95"), "press_max_median": med("press_max"),
         "nights_press_at_max": int(daily["press_at_max"].sum()) if "press_at_max" in daily else 0,
         "set_min": _num(used["set_min"].iloc[-1]) if len(used) else None,
         "set_max": _num(used["set_max"].iloc[-1]) if len(used) else None,
@@ -210,7 +234,10 @@ def observations(summary: dict) -> List[dict]:
     if ahi is not None:
         n5 = summary.get("nights_ahi_ge_5", 0)
         lvl = "ok" if ahi < 5 else "alerta"
-        obs.append({"level": lvl, "text": f"IAH médio de {_br(ahi)} ev/h" + (f"; {n5} noite(s) com IAH ≥ 5." if n5 else ".")})
+        med = summary.get("ahi_median")
+        head = (f"IAH mediano de {_br(med)} ev/h (média ponderada pelas horas: {_br(ahi)})" if med is not None
+                else f"IAH médio de {_br(ahi)} ev/h")
+        obs.append({"level": lvl, "text": head + (f"; {n5} noite(s) com IAH ≥ 5." if n5 else ".")})
     n_max, used = summary.get("nights_press_at_max", 0), summary.get("nights_used", 0)
     if used and n_max and n_max / used >= 0.1:
         obs.append({"level": "atencao", "text":

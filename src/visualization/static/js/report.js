@@ -5,6 +5,7 @@ const params = new URLSearchParams(location.search);
 
 const f = (v, nd = 1) => (v === null || v === undefined || Number.isNaN(v)) ? '—' : Number(v).toFixed(nd).replace('.', ',');
 const br = d => { if (!d) return '—'; const p = d.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; };
+const eprText = cs => cs.epr_on === 0 ? `desligado (nível ${f(cs.epr, 0)} configurado)` : cs.epr_on === 1 ? `ligado, nível ${f(cs.epr, 0)}` : f(cs.epr, 0);
 const hm = h => { if (h === null || h === undefined) return '—'; const m = Math.round(h * 60); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
 
 Chart.defaults.font.family = "'Segoe UI', Roboto, Arial, sans-serif";
@@ -97,33 +98,40 @@ function render(d) {
 
     document.getElementById('r-stats').innerHTML = [
         stat('Adesão (noites ≥ 4 h)', `${f(s.adherence_pct, 0)}%`, `${s.nights_adherent} de ${s.days} dias · meta ${d.adherence_target}%`, s.adherence_ok ? 'good' : 'bad'),
-        stat('Dias com uso', `${s.nights_used} / ${s.days}`, `${f(100 * s.nights_used / s.days, 0)}% dos dias · ${f(s.total_hours, 0)} h no total`),
-        stat('Uso médio', hm(s.usage_avg_all_days_h), `por dia (sem uso = 0) · ${hm(s.usage_avg_used_nights_h)} por noite usada`),
-        stat('IAH residual', f(s.ahi_avg), `eventos/h · mediana ${f(s.ahi_median)} · máx ${f(s.ahi_max)} · ${s.nights_ahi_ge_5} noites ≥ 5`, s.ahi_avg < 5 ? 'good' : 'bad'),
-        stat('Fuga P95', `${f(s.leak95_avg)} L/min`, `média · máx ${f(s.leak95_max)} · ${s.nights_leak_gt_24} noites > 24 L/min`, s.leak95_avg <= 24 ? 'good' : 'bad'),
-        stat('Pressão P95', `${f(s.press95_avg)} cmH₂O`, `média · P50 ${f(s.press50_avg)} · faixa ${f(s.set_min, 0)}–${f(s.set_max, 0)}`),
+        stat('Dias com uso', `${s.nights_used} / ${s.days}`, `${s.nights_adherent} com ≥ 4 h · ${s.nights_short} com < 4 h · ${s.nights_unused} sem uso · ${hm(s.total_hours)} no total`),
+        stat('Uso diário', hm(s.usage_median_used_nights_h), `mediana das noites usadas · média ${hm(s.usage_avg_all_days_h)} por dia (sem uso = 0)`),
+        stat('IAH residual', f(s.ahi_median), `mediana ev/h · média pond. ${f(s.ahi_avg)} · máx ${f(s.ahi_max)} · ${s.nights_ahi_ge_5} noites ≥ 5`, s.ahi_median < 5 ? 'good' : 'bad'),
+        stat('Fuga P95', `${f(s.leak95_median)} L/min`, `mediana · máx. mediana ${f(s.leak_max_median)} · ${s.nights_leak_gt_24} noites com P95 > 24 L/min`, s.leak95_median <= 24 ? 'good' : 'bad'),
+        stat('Pressão P95', `${f(s.press95_median)} cmH₂O`, `mediana · P50 ${f(s.press50_median)} · máx. ${f(s.press_max_median)} · faixa ${f(s.set_min, 0)}–${f(s.set_max, 0)}`),
     ].join('');
 
     document.getElementById('r-obs').innerHTML = (d.observations || []).map(o => `<li class="${o.level}">${o.text}</li>`).join('')
         || '<li>Nenhum ponto de atenção no período.</li>';
 
     const rows = [
-        ['IAH total', s.ahi_avg, true],
-        ['Apneia central (IAC)', s.cai_avg],
-        ['Apneia obstrutiva (IAO)', s.oai_avg],
-        ['Apneia não classificada', s.uai_avg],
-        ['Hipopneia (IH)', s.hi_avg],
+        ['IAH total', s.ahi_median, s.ahi_avg, true],
+        ['Índice de apneia (IA)', s.ai_median, null],
+        ['Apneia central (IAC)', s.cai_median, s.cai_avg],
+        ['Apneia obstrutiva (IAO)', s.oai_median, s.oai_avg],
+        ['Apneia não classificada', s.uai_median, s.uai_avg],
+        ['Hipopneia (IH)', s.hi_median, s.hi_avg],
+        ['Índice RERA', s.rin_median, null],
+        ['% tempo em respiração de Cheyne-Stokes', s.csr_median, null],
     ];
-    document.getElementById('r-events').innerHTML = rows.map(([l, v, b]) => `<tr><td>${b ? `<b>${l}</b>` : l}</td><td class="num">${b ? `<b>${f(v, 2)}</b>` : f(v, 2)}</td></tr>`).join('')
-        + `<tr><td>Proporção central no IAH</td><td class="num"><b>${f(s.central_share_pct, 0)}%</b></td></tr>`;
+    const cell = (v, b) => b ? `<b>${f(v, 2)}</b>` : f(v, 2);
+    document.getElementById('r-events').innerHTML = rows.map(([l, m, a, b]) =>
+        `<tr><td>${b ? `<b>${l}</b>` : l}</td><td class="num">${cell(m, b)}</td><td class="num">${a === null ? '' : cell(a, b)}</td></tr>`).join('')
+        + `<tr><td>Proporção central no IAH</td><td class="num"></td><td class="num"><b>${f(s.central_share_pct, 0)}%</b></td></tr>`;
 
     const changes = (d.settings_changes || []).filter(c => c.date >= s.start && c.date <= s.end);
     document.getElementById('r-settings').innerHTML = [
         ['Modo', mode],
         ['Faixa de pressão configurada', `${f(cs.set_min)} – ${f(cs.set_max)} cmH₂O`],
-        ['EPR (alívio expiratório)', f(cs.epr, 0)],
-        ['Pressão mediana (P50) média', `${f(s.press50_avg)} cmH₂O`],
-        ['Pressão P95 média', `${f(s.press95_avg)} cmH₂O`],
+        ['EPR (alívio expiratório)', eprText(cs)],
+        ['Pressão mediana (P50)', `${f(s.press50_median)} cmH₂O`],
+        ['Pressão P95', `${f(s.press95_median)} cmH₂O`],
+        ['Pressão máxima', `${f(s.press_max_median)} cmH₂O`],
+        ['Fuga mediana / P95 / máxima', `${f(s.leak50_median)} / ${f(s.leak95_median)} / ${f(s.leak_max_median)} L/min`],
         ['Noites com P95 no máximo', `${s.nights_press_at_max} de ${s.nights_used}`],
         ['Mudanças de configuração', changes.length ? changes.map(c => `${br(c.date)}: ${f(c.from.set_min, 0)}–${f(c.from.set_max, 0)} → ${f(c.to.set_min, 0)}–${f(c.to.set_max, 0)}`).join('; ') : 'nenhuma no período'],
     ].map(([k, v]) => `<tr><td>${k}</td><td class="num">${v}</td></tr>`).join('');

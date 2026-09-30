@@ -106,15 +106,15 @@ function renderTrends(data) {
     document.getElementById('trend-range').textContent = `${formatDateBR(s.start)} a ${formatDateBR(s.end)} · ${s.days} dias`;
 
     const adhColor = s.adherence_pct >= data.adherence_target ? 'text-green-400' : 'text-red-400';
-    const ahiColor = s.ahi_avg < 5 ? 'text-green-400' : s.ahi_avg < 15 ? 'text-yellow-400' : 'text-red-400';
+    const ahiColor = s.ahi_median < 5 ? 'text-green-400' : s.ahi_median < 15 ? 'text-yellow-400' : 'text-red-400';
     const cenColor = s.central_share_pct >= 50 ? 'text-yellow-400' : 'text-gray-200';
     document.getElementById('trend-kpis').innerHTML = [
         kpiCard('Adesão', `${fmt(s.adherence_pct, 0)}%`, `noites ≥ ${data.adherence_min_h} h`, `${s.nights_adherent} de ${s.days} dias · meta ${data.adherence_target}%`, adhColor),
-        kpiCard('Uso médio', `${fmt(s.usage_avg_all_days_h)} h`, 'todos os dias', `${fmt(s.usage_avg_used_nights_h)} h nas ${s.nights_used} noites usadas`),
-        kpiCard('IAH médio', fmt(s.ahi_avg), 'eventos/h', `mediana ${fmt(s.ahi_median)} · ${s.nights_ahi_ge_5} noites ≥ 5`, ahiColor),
-        kpiCard('Apneia central', `${fmt(s.central_share_pct, 0)}%`, 'do IAH', `IAC ${fmt(s.cai_avg, 2)} · IAO ${fmt(s.oai_avg, 2)} · IH ${fmt(s.hi_avg, 2)}`, cenColor),
-        kpiCard('Fuga P95', fmt(s.leak95_avg), 'L/min (média)', `máx ${fmt(s.leak95_max)} · ${s.nights_leak_gt_24} noites > 24`, s.leak95_avg <= 24 ? 'text-green-400' : 'text-red-400'),
-        kpiCard('Pressão P95', fmt(s.press95_avg), 'cmH₂O (média)', `faixa ${fmt(s.set_min, 0)}–${fmt(s.set_max, 0)} · no máx. em ${s.nights_press_at_max} noites`, s.nights_used && s.nights_press_at_max / s.nights_used >= 0.1 ? 'text-yellow-400' : 'text-white'),
+        kpiCard('Uso médio', `${fmt(s.usage_avg_all_days_h)} h`, 'todos os dias', `mediana ${fmt(s.usage_median_used_nights_h)} h nas ${s.nights_used} noites usadas`),
+        kpiCard('IAH', fmt(s.ahi_median), 'mediana ev/h', `média pond. ${fmt(s.ahi_avg)} · ${s.nights_ahi_ge_5} noites ≥ 5`, ahiColor),
+        kpiCard('Apneia central', `${fmt(s.central_share_pct, 0)}%`, 'do IAH', `mediana: IAC ${fmt(s.cai_median, 1)} · IAO ${fmt(s.oai_median, 1)} · IH ${fmt(s.hi_median, 1)}`, cenColor),
+        kpiCard('Fuga P95', fmt(s.leak95_median), 'L/min (mediana)', `máx ${fmt(s.leak95_max)} · ${s.nights_leak_gt_24} noites > 24`, s.leak95_median <= 24 ? 'text-green-400' : 'text-red-400'),
+        kpiCard('Pressão P95', fmt(s.press95_median), 'cmH₂O (mediana)', `faixa ${fmt(s.set_min, 0)}–${fmt(s.set_max, 0)} · no máx. em ${s.nights_press_at_max} noites`, s.nights_used && s.nights_press_at_max / s.nights_used >= 0.1 ? 'text-yellow-400' : 'text-white'),
     ].join('');
 
     const icon = { ok: '🟢', alerta: '🔴', atencao: '🟡' };
@@ -201,7 +201,7 @@ function renderTrends(data) {
 
     const cs = data.current_settings || {};
     const modeName = cs.mode === 1 ? 'AutoSet' : cs.mode === 0 ? 'CPAP fixo' : `modo ${cs.mode}`;
-    let txt = `Configuração atual: ${modeName}, pressão ${fmt(cs.set_min, 1)}–${fmt(cs.set_max, 1)} cmH₂O, EPR ${fmt(cs.epr, 0)}.`;
+    let txt = `Configuração atual: ${modeName}, pressão ${fmt(cs.set_min, 1)}–${fmt(cs.set_max, 1)} cmH₂O, EPR ${cs.epr_on === 0 ? `desligado (nível ${fmt(cs.epr, 0)} configurado)` : fmt(cs.epr, 0)}.`;
     txt += data.settings_changes.length
         ? ' Mudanças: ' + data.settings_changes.map(c => `${formatDateBR(c.date)} (${fmt(c.from.set_min, 0)}–${fmt(c.from.set_max, 0)} → ${fmt(c.to.set_min, 0)}–${fmt(c.to.set_max, 0)} cmH₂O, EPR ${fmt(c.from.epr, 0)} → ${fmt(c.to.epr, 0)})`).join('; ')
         : ' Sem mudanças de configuração no histórico.';
